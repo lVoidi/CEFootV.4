@@ -1,24 +1,31 @@
-import digitalio
+from machine import Pin
 import threading
 import random
-import board
+import utime
 
-# Leds para cada equipo
-blue_team = digitalio.DigitalInOut(board.GP27)
-red_team = digitalio.DigitalInOut(board.GP26)
+data_pin = Pin(13, Pin.OUT)
+latch_pin = Pin(15, Pin.OUT)
+clock_pin = Pin(14, Pin.OUT)
 
-blue_team.direction = digitalio.Direction.OUTPUT
-red_team.direction = digitalio.Direction.OUTPUT
-
-# No estoy seguro, hasta que sepa como se usa el Shift Register
-reg_clk = digitalio.DigitalInOut(board.GP19)
-reg_con = digitalio.DigitalInOut(board.GP18)
+# Boton del team y leds
+change_player_signal = Pin(5, Pin.IN, Pin.PULL_UP)
+blue_team = Pin(26, Pin.OUT)
+red_team = Pin(27, Pin.OUT)
+blue_team.high()
+red_team.low()
 
 def main():
     current_team_playing = blue_team
     # Leds de cada paleta
     goal = [i for i in range(6)]
     while True:
+        if change_player_signal:
+            blue_team.low()
+            red_team.high()
+        else:
+            blue_team.high()
+            red_team.low()
+
         anotation_algorithm = random.choice(1, 3)
         match anotation_algorithm:
             case 1:
