@@ -41,6 +41,7 @@ def listen_to_goal(goalkeeper_indices, team):
             # Código para el gol de un equipo
             pass 
         else:
+            pass
             # Código para cuando el equipo no hace gol
 
 
