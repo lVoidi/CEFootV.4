@@ -9,10 +9,23 @@ clock_pin = Pin(14, Pin.OUT)
 
 # Boton del team y leds
 change_player_signal = Pin(5, Pin.IN, Pin.PULL_UP)
-blue_team = Pin(26, Pin.OUT)
-red_team = Pin(27, Pin.OUT)
-blue_team.high()
-red_team.low()
+blue_team = {
+    "pin": Pin(26, Pin.OUT),
+    "nombre": "", 
+    "goles": {}, # {"artillero": n} donde n es la cantidad de goles 
+    "fallados": [], 
+}
+
+red_team = {
+    "pin": Pin(27, Pin.OUT),
+    "nombre": "", 
+    "goles": {}, # {"artillero": n} donde n es la cantidad de goles 
+    "fallados": [], 
+}
+
+# Empieza con el azul como team inicial
+blue_team["pin"].high()
+red_team["pin"].low()
 
 
 # Botones de cada paleta 
@@ -51,12 +64,12 @@ def main():
     while True:
         if change_player_signal.value():
             current_team_playing = "red"
-            blue_team.low()
-            red_team.high()
+            blue_team["pin"].low()
+            red_team["pin"].high()
         else:
             current_team_playing = "blue"
-            blue_team.high()
-            red_team.low()
+            blue_team["pin"].high()
+            red_team["pin"].low()
 
         anotation_algorithm = random.choice(1, 3)
 
@@ -87,5 +100,6 @@ def main():
                     index_list = list(filter(lambda x: (x % 2 == 1), goal))
         listen_to_goal(index_list, current_team_playing)
 
-main_thread = threading.Thread(target=main)
-main_thread.start()
+if __name__ == "__main__":
+    main_thread = threading.Thread(target=main)
+    main_thread.start()
