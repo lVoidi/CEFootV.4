@@ -16,7 +16,6 @@ red_team.low()
 
 
 # Botones de cada paleta 
-
 goal_buttons = [
     Pin(7, Pin.IN, Pin.PULL_UP),
     Pin(8, Pin.IN, Pin.PULL_UP),
@@ -50,7 +49,7 @@ def main():
     # Leds de cada paleta
     goal = [i for i in range(6)]
     while True:
-        if change_player_signal:
+        if change_player_signal.value():
             current_team_playing = "red"
             blue_team.low()
             red_team.high()
