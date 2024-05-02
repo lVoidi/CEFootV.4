@@ -1,7 +1,6 @@
 from machine import Pin
-import threading
 import random
-import utime
+import time
 
 data_pin = Pin(13, Pin.OUT)
 latch_pin = Pin(15, Pin.OUT)
@@ -30,12 +29,12 @@ red_team["pin"].low()
 
 # Botones de cada paleta 
 goal_buttons = [
-    Pin(7, Pin.IN, Pin.PULL_UP),
-    Pin(8, Pin.IN, Pin.PULL_UP),
-    Pin(9, Pin.IN, Pin.PULL_UP),
-    Pin(10, Pin.IN, Pin.PULL_UP),
-    Pin(11, Pin.IN, Pin.PULL_UP),
-    Pin(12, Pin.IN, Pin.PULL_UP),
+    Pin(7, Pin.IN),
+    Pin(8, Pin.IN),
+    Pin(9, Pin.IN),
+    Pin(10, Pin.IN),
+    Pin(11, Pin.IN),
+    Pin(12, Pin.IN),
 ]
 
 
@@ -48,14 +47,15 @@ def listen_to_goal(goalkeeper_indices, team):
             button.value() for button in goal_buttons
         ]
     
-    for index, value in values:
-        if value and i in goalkeeper_indices:
-            # Código para el gol de un equipo
-            pass 
-        else:
-            pass
+    for index, value in enumerate(values):
+        if value and index in goalkeeper_indices:
+            print("no gol")
+            break   
+    else:    
+        print("gol")
             # Código para cuando el equipo no hace gol
-
+    print(values)
+    time.sleep(2)
 
 def main():
     current_team_playing = "blue"
@@ -71,35 +71,31 @@ def main():
             blue_team["pin"].high()
             red_team["pin"].low()
 
-        anotation_algorithm = random.choice(1, 3)
+        anotation_algorithm = random.randint(1, 3)
 
         # Índices de las paletas en las que está el portero
         index_list = []
-        match anotation_algorithm:
-            case 1:
-                goalkeeper_index = random.sample(goal, 2)
-                index_list = [goalkeeper_index, goalkeeper_index + 1] if goalkeeper_index + 1 < len(goal) else [goalkeeper_index - 1, goalkeeper_index]
-
-                # Aquí debería checar si el botón presionado está relacionado con el portero
-
-            case 2:
-                goalkeeper_index = random.sample(goal, 3)
-                index_list = []
-                if goalkeeper_index == len(goal) - 1:
-                    index_list = [goalkeeper_index-2, goalkeeper_index-1, goalkeeper_index]
-                elif goalkeeper_index == 0:
-                    index_list = [goalkeeper_index, goalkeeper_index + 1, goalkeeper_index + 2]
-                else:
-                    index_list = [goalkeeper_index-1, goalkeeper_index, goalkeeper_index + 1]
-            case 3:
-                group = random.randint(0, 1)
-                index_list = []
-                if group == 1:
-                    index_list = list(filter(lambda x: (x % 2 == 0), goal))
-                else:
-                    index_list = list(filter(lambda x: (x % 2 == 1), goal))
+        if anotation_algorithm == 1:
+            goalkeeper_index = random.choice(goal)
+            index_list = [goalkeeper_index, goalkeeper_index + 1] if goalkeeper_index + 1 < len(goal) else [goalkeeper_index - 1, goalkeeper_index]
+        elif anotation_algorithm == 2:
+            goalkeeper_index = random.choice(goal)
+            ndex_list = []
+            if goalkeeper_index == len(goal) - 1:
+                index_list = [goalkeeper_index-2, goalkeeper_index-1, goalkeeper_index]
+            elif goalkeeper_index == 0:
+                index_list = [goalkeeper_index, goalkeeper_index + 1, goalkeeper_index + 2]
+            else:
+                index_list = [goalkeeper_index-1, goalkeeper_index, goalkeeper_index + 1]
+        else:
+            group = random.randint(0, 1)
+            index_list = []
+            if group == 1:
+                index_list = list(filter(lambda x: (x % 2 == 0), goal))
+            else:
+                index_list = list(filter(lambda x: (x % 2 == 1), goal))
+        print(index_list)
         listen_to_goal(index_list, current_team_playing)
 
 if __name__ == "__main__":
-    main_thread = threading.Thread(target=main)
-    main_thread.start()
+    main()
