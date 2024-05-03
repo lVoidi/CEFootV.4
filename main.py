@@ -1,4 +1,4 @@
-from machine import Pin
+from machine import Pin, ADC
 import random
 import time
 
@@ -37,6 +37,7 @@ goal_buttons = [
     Pin(12, Pin.IN),
 ]
 
+pot = ADC(Pin(26))
 
 def listen_to_goal(goalkeeper_indices, team):
     values = [
@@ -94,7 +95,6 @@ def main():
                 index_list = list(filter(lambda x: (x % 2 == 0), goal))
             else:
                 index_list = list(filter(lambda x: (x % 2 == 1), goal))
-        print(index_list)
         listen_to_goal(index_list, current_team_playing)
 
 if __name__ == "__main__":
