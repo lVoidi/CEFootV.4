@@ -9,10 +9,10 @@
     "micropico.openOnStart": true,
     "python.analysis.typeshedPaths": [
         "~\\.micropico-stubs\\included",
-        ".vscode/Pico-W-Stub"
+        "~\\.micropico-stubs\\included"
     ],
     "python.analysis.extraPaths": [
         "~\\.micropico-stubs\\included",
-        ".vscode/Pico-W-Stub"
+        "~\\.micropico-stubs\\included"
     ]
 }
