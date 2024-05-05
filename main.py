@@ -1,4 +1,4 @@
-from machine import Pin, ADC, UART
+from machine import Pin, ADC#, UART
 import random
 import time
 import uos 
@@ -38,10 +38,10 @@ goal_buttons = [
     Pin(12, Pin.IN),
 ]
 
-baudrate = 115200
-uart = UART(0, baudrate=baudrate) 
-uart.init(baudrate, bits=8, parity=None, stop=1)
-uos.dupterm(uart)
+#baudrate = 115200
+#uart = UART(0, baudrate=baudrate) 
+#uart.init(baudrate, bits=8, parity=None, stop=1)
+#uos.dupterm(uart)
 
 def listen_to_goal(goalkeeper_indices, team):
     values = [
