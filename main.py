@@ -1,6 +1,7 @@
-from machine import Pin, ADC
+from machine import Pin, ADC, UART
 import random
 import time
+import uos 
 
 data_pin = Pin(13, Pin.OUT)
 latch_pin = Pin(15, Pin.OUT)
@@ -37,7 +38,10 @@ goal_buttons = [
     Pin(12, Pin.IN),
 ]
 
-pot = ADC(Pin(26))
+baudrate = 115200
+uart = UART(0, baudrate=baudrate) 
+uart.init(baudrate, bits=8, parity=None, stop=1)
+uos.dupterm(uart)
 
 def listen_to_goal(goalkeeper_indices, team):
     values = [
@@ -50,12 +54,10 @@ def listen_to_goal(goalkeeper_indices, team):
     
     for index, value in enumerate(values):
         if value and index in goalkeeper_indices:
-            print("no gol")
-            break   
+            print("A"*128)
     else:    
-        print("gol")
+        print("B"*128)
             # Código para cuando el equipo no hace gol
-    print(values)
     time.sleep(2)
 
 def main():
@@ -99,3 +101,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
