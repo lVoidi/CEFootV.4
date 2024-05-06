@@ -1,8 +1,10 @@
 from comunicate import update_data
 from PIL import Image, ImageTk
 import tkinter as tk
-import time
+import threading
+import random
 import pygame
+import time
 
 
 pygame.mixer.init()
@@ -161,29 +163,99 @@ def start_game():
 
 selected = False
 
+def select():
+    global selected 
+    selected = True
+
 def on_game_start(win):
-    global selected
+    global selected, team_1, team_2
     if not (team_1["name"] and team_2["name"]):
         return
     win.withdraw()
-    print("aca")
+    
+    new_win = tk.Toplevel(main_window)
+
+    new_win.config(bg="#000000")
+    new_win.attributes("-fullscreen", True)
+    new_win.attributes("-topmost", True)
+
     pool_1 = [f"{key}.jpg" for key in team_1["jugadores"].keys()]
     pool_2 = [f"{key}.jpg" for key in team_2["jugadores"].keys()]
+    teams = (team_1["name"], team_2["name"])
+    local_team = random.choice(teams)
 
+    if team_1["name"] != local_team:
+        team_1, team_2 = team_2, team_1
+
+    title = tk.Label(
+        new_win,
+        text=f"Seleccione artillero equipo {local_team}",
+        fg="#ffffff",
+        bg="#000000",
+        font=("04b", 40)
+    )
+
+    image = ImageTk.PhotoImage(Image.open("assets/coin.gif").resize((128, 128)))
+    img = ""
+    main_window.coin = image
+    coin = tk.Label(
+        new_win,
+        image=image,
+    )
+    current_player = tk.Label(
+        new_win,
+    )
+    select_button = tk.Button(
+        new_win,
+        text="Seleccionar",
+        fg="#ffffff",
+        bg="#000000",
+        bd=0,
+        relief="flat",
+        command=select,
+        font=("04b", 40)
+    )
+    initial = None
+    if local_team == teams[0]:
+        initial = ImageTk.PhotoImage(Image.open(f"assets/{local_team.lower().replace(" ", "_")}/{pool_1[0]}").resize((512, 512)))
+    else:
+        initial = ImageTk.PhotoImage(Image.open(f"assets/{local_team.lower().replace(" ", "_")}/{pool_2[0]}").resize((512, 512)))
+    main_window.initial = initial
+    current_player["image"] = initial
+    coin.grid(row=0, column=0)
+    title.grid(row=0, column=1)
+    current_player.grid(row=1, column=0, sticky="nsew", columnspan=2)
+    select_button.grid(row=2, column=0, sticky="nsew", columnspan=2)
+    new_win.bind("<Key>", lambda e: close_window(e, win, win_to_deiconify=main_window))   
+    thread = threading.Thread(target=change_image, args=(current_player, local_team, teams.index(local_team), teams, title, play))
+    thread.start()
+
+def change_image(label, local_team, team_index, teams, title):
+    global selected
+    pool_1 = [f"{key}.jpg" for key in team_1["jugadores"].keys()]
+    pool_2 = [f"{key}.jpg" for key in team_2["jugadores"].keys()]
+    title_list = ["artillero", "portero"]
     for pool in range(2):
+        print(f"{pool=} {team_index=}")
+        title["text"] = f"Seleccione el {title_list[pool]} para {teams[team_index-pool]}"
         while not selected:
             try:
-                image = ""
+                img = ""
+                image = None
                 if pool == 0:
                     get_pot_value = int(update_data("00\r")[1]) # Para el potenciómetro  
-                    image = pool_1[get_pot_value-1]
+                    img = pool_1[get_pot_value-1]
+                    image = ImageTk.PhotoImage(Image.open(f"assets/{local_team.lower().replace(" ", "_")}/{img}").resize((512, 512)))
                 else:
                     get_pot_value = int(update_data("00\r")[1]) # Para el potenciómetro  
-                    image = pool_2[get_pot_value-1]
+                    img = pool_2[get_pot_value-1]
+                    image = ImageTk.PhotoImage(Image.open(f"assets/{teams[team_index-1].lower().replace(" ", "_")}/{img}").resize((512, 512)))
+                setattr(main_window, f"a{random.randint(0, 999)}", image)
+                label["image"] = image
             except Exception as e:
                 print("Excepción: ", e, ": Omitiendo")
-            time.sleep(0.1)
-    
+
+        selected = False
 
 
 
@@ -229,14 +301,14 @@ def on_team_select(team, label):
             }
         else:
             team_2 = {
-                "name": "Steins Gate",
+                "name": "One Piece",
                 "jugadores": {
-                    "faris": 0,
-                    "itaru": 0,
-                    "kurisu": 0,
-                    "okabe": 0,
-                    "ruka": 0,
-                    "suzuha": 0
+                    "luffy": 0,
+                    "chopper": 0,
+                    "jinbe": 0,
+                    "sanji": 0,
+                    "zoro": 0,
+                    "kuma": 0
                 }
             }
     elif team == 3:
