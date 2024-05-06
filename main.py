@@ -56,6 +56,7 @@ def listen_to_goal(goalkeeper_indices, team):
     values = [
         button.value() for button in goal_buttons
     ]
+    print(goalkeeper_indices)
     while not any(values):
         if change_player_signal.value() and current_team_playing == "blue":
             print(red_team.value(), blue_team.value())
@@ -74,16 +75,20 @@ def listen_to_goal(goalkeeper_indices, team):
     
     code = False
     goal = ""
-    for value in values:
-        goal += f"{value}"
+    for i in range(6):
+        if i in goalkeeper_indices:
+            goal += "1"
+        else:
+            goal += "0"
 
     for index, value in enumerate(values):
         if value:
             pressed_button_index = index
         if value and index in goalkeeper_indices:
-            code = f"A:{index}:{goal}"
+            code = f"B:{index}:{goal}"
+            break
     else:    
-        code = f"B:{pressed_button_index}:{goal}"
+        code = f"A:{pressed_button_index}:{goal}"
 
     goal_leds[pressed_button_index].value(1)
     print(pressed_button_index, goal_leds[pressed_button_index])
