@@ -10,7 +10,9 @@ import time
 pygame.mixer.init()
 pygame.mixer.music.load("assets/crowd.mp3")
 pygame.mixer.music.play(loops=-1)
-
+pito_sfx = pygame.mixer.Sound("assets/pito.mp3")
+gol_sfx = pygame.mixer.Sound("assets/gol.mp3")
+abucheo_sfx = pygame.mixer.Sound("assets/abucheo.mp3")
 main_window = tk.Tk()
 main_window.config(bg="#000000")
 main_window.attributes("-fullscreen", True)
@@ -171,7 +173,11 @@ def select():
     selected = True
 
 
-def on_game_start(win):
+artillero_actual = ""
+team_actual = ""
+
+
+def on_game_start(win, last_team=""):
     global selected, team_1, team_2
     if not (team_1["name"] and team_2["name"]):
         return
@@ -186,8 +192,11 @@ def on_game_start(win):
     pool_1 = [f"{key}.jpg" for key in team_1["jugadores"].keys()]
     pool_2 = [f"{key}.jpg" for key in team_2["jugadores"].keys()]
     teams = (team_1["name"], team_2["name"])
-    local_team = random.choice(teams)
-
+    local_team = ""
+    if not last_team:
+        local_team = random.choice(teams)
+    else:
+        local_team = teams[teams.index(local_team)]
     if team_1["name"] != local_team:
         team_1, team_2 = team_2, team_1
 
@@ -225,7 +234,8 @@ def on_game_start(win):
         text="Jugar",
         bd=0,
         relief="flat",
-        command=select,
+        state="disabled",
+        command=lambda: play_game(new_win, artillero_actual, team_actual),
         font=("04b", 40)
     )
 
@@ -242,6 +252,7 @@ def on_game_start(win):
     title.grid(row=0, column=1)
     current_player.grid(row=1, column=0, sticky="nsew", columnspan=2)
     select_button.grid(row=2, column=0, sticky="nsew", columnspan=2)
+    play.grid(row=3, column=0, sticky="nsew", columnspan=2)
     new_win.bind("<Key>", lambda e: close_window(e, win, win_to_deiconify=main_window))
     thread = threading.Thread(target=change_image,
                               args=(current_player, local_team, teams.index(local_team), teams, title, play))
@@ -249,7 +260,7 @@ def on_game_start(win):
 
 
 def change_image(label, local_team, team_index, teams, title, button):
-    global selected
+    global selected, artillero_actual, team_actual
     pool_1 = [f"{key}.jpg" for key in team_1["jugadores"].keys()]
     pool_2 = [f"{key}.jpg" for key in team_2["jugadores"].keys()]
     title_list = ["artillero", "portero"]
@@ -263,26 +274,31 @@ def change_image(label, local_team, team_index, teams, title, button):
                 if pool == 0:
                     get_pot_value = int(update_data("00\r")[1])  # Para el potenciómetro
                     img = pool_1[get_pot_value - 1]
+                    team_actual = team_1
                     image = ImageTk.PhotoImage(
                         Image.open(f"assets/{local_team.lower().replace(" ", "_")}/{img}").resize((512, 512)))
                 else:
                     get_pot_value = int(update_data("00\r")[1])  # Para el potenciómetro
                     img = pool_2[get_pot_value - 1]
+                    team_actual = team_2
                     image = ImageTk.PhotoImage(
                         Image.open(f"assets/{teams[team_index - 1].lower().replace(" ", "_")}/{img}").resize(
                             (512, 512)))
+                artillero_actual = img.replace(".jpg", "")
                 setattr(main_window, f"a{random.randint(0, 999)}", image)
                 label["image"] = image
             except Exception as e:
                 print("Excepción: ", e, ": Omitiendo")
 
         selected = False
+    button["state"] = "active"
 
 
 def play_game(win, artillero, equipo):
     global team_1, team_2
-    win.withdraw()
+    win.destroy()
     level_window = tk.Toplevel(main_window)
+    level_window.config(bg="#000000")
     level_window.attributes("-fullscreen", True)
     level_window.attributes("-topmost", True)
 
@@ -295,10 +311,8 @@ def play_game(win, artillero, equipo):
     )
 
     background = ImageTk.PhotoImage(Image.open("assets/back.png"))
+    level_window.b = background
 
-    pito_sfx = pygame.mixer.Sound("assets/pito.mp3")
-    gol_sfx = pygame.mixer.Sound("assets/gol.mp3")
-    abucheo_sfx = pygame.mixer.Sound("assets/abucheo.mp3")
     pito_sfx.play()
 
     canva_juego.create_image(
@@ -306,9 +320,13 @@ def play_game(win, artillero, equipo):
         image=background,
         anchor="nw"
     )
+
+    canva_juego.pack()
+    t = threading.Thread(target=check_goal, args=(artillero, equipo, gol_sfx, abucheo_sfx, level_window))
+    t.start()
+def check_goal(artillero, equipo, gol_sfx, abucheo_sfx, level_window: tk.Toplevel):
     done = False
     goles, cobros = 0, 0
-
     while not done:
         try:
             is_goal = "1" in update_data("000\r")
@@ -335,11 +353,12 @@ def play_game(win, artillero, equipo):
                 cobros += 1
 
                 team_2["jugadores"][artillero] = [goles, cobros]
+            print(goles, cobros, equipo, is_goal)
             done = True
-
+            level_window.after(5000, level_window.destroy)
+            on_game_start(main_window, equipo)
         except Exception as e:
             messagebox.showerror("Error interno", f"{e}: Tire la bola de nuevo.")
-
 
 def on_team_select(team, label):
     global team_1, team_2, new
@@ -347,6 +366,7 @@ def on_team_select(team, label):
         if new:
             team_1 = {
                 "name": "Steins Gate",
+                "goles": [0, 0],
                 "jugadores": {
                     "faris": [0, 0],
                     "itaru": [0, 0],
@@ -359,6 +379,7 @@ def on_team_select(team, label):
         else:
             team_2 = {
                 "name": "Steins Gate",
+                "goles": [0, 0],
                 "jugadores": {
                     "faris": [0, 0],
                     "itaru": [0, 0],
@@ -372,6 +393,7 @@ def on_team_select(team, label):
         if new:
             team_1 = {
                 "name": "One Piece",
+                "goles": [0, 0],
                 "jugadores": {
                     "luffy": [0, 0],
                     "chopper": [0, 0],
@@ -384,6 +406,7 @@ def on_team_select(team, label):
         else:
             team_2 = {
                 "name": "One Piece",
+                "goles": [0, 0],
                 "jugadores": {
                     "luffy": [0, 0],
                     "chopper": [0, 0],
@@ -397,6 +420,7 @@ def on_team_select(team, label):
         if new:
             team_1 = {
                 "name": "Jojos",
+                "goles": [0, 0],
                 "jugadores": {
                     "giorno": [0, 0],
                     "jhonny": [0, 0],
@@ -409,6 +433,7 @@ def on_team_select(team, label):
         else:
             team_2 = {
                 "name": "Jojos",
+                "goles": [0, 0],
                 "jugadores": {
                     "giorno": [0, 0],
                     "jhonny": [0, 0],
