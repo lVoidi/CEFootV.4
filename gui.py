@@ -1,11 +1,11 @@
 from comunicate import update_data
 from PIL import Image, ImageTk
+from tkinter import messagebox
 import tkinter as tk
 import threading
 import random
 import pygame
 import time
-
 
 pygame.mixer.init()
 pygame.mixer.music.load("assets/crowd.mp3")
@@ -17,11 +17,10 @@ main_window.attributes("-fullscreen", True)
 main_window.attributes("-topmost", True)
 
 logo = ImageTk.PhotoImage(
-        Image.open("assets/logo.png").resize((1280, 720))
-    )
+    Image.open("assets/logo.png").resize((1280, 720))
+)
 
 main_window.image = logo
-
 
 title = tk.Label(
     main_window,
@@ -55,7 +54,6 @@ def about_page():
         font=("04b", 50)
     )
 
-
     info = tk.Label(
         win,
         text="""Este juego fue creado por 
@@ -87,6 +85,7 @@ Luis Barboza Artavia.
     rod.pack()
     win.bind("<Key>", lambda e: close_window(e, win, win_to_deiconify=main_window))
 
+
 team_1 = {
     "name": "",
     "jugadores": {},
@@ -96,6 +95,8 @@ team_2 = {
     "jugadores": {},
 }
 new = True
+
+
 def start_game():
     main_window.withdraw()
     win = tk.Toplevel(main_window)
@@ -161,18 +162,21 @@ def start_game():
     play.grid(row=3, column=0, columnspan=3)
     win.bind("<Key>", lambda e: close_window(e, win, win_to_deiconify=main_window))
 
+
 selected = False
 
+
 def select():
-    global selected 
+    global selected
     selected = True
+
 
 def on_game_start(win):
     global selected, team_1, team_2
     if not (team_1["name"] and team_2["name"]):
         return
     win.withdraw()
-    
+
     new_win = tk.Toplevel(main_window)
 
     new_win.config(bg="#000000")
@@ -227,18 +231,22 @@ def on_game_start(win):
 
     initial = None
     if local_team == teams[0]:
-        initial = ImageTk.PhotoImage(Image.open(f"assets/{local_team.lower().replace(" ", "_")}/{pool_1[0]}").resize((512, 512)))
+        initial = ImageTk.PhotoImage(
+            Image.open(f"assets/{local_team.lower().replace(" ", "_")}/{pool_1[0]}").resize((512, 512)))
     else:
-        initial = ImageTk.PhotoImage(Image.open(f"assets/{local_team.lower().replace(" ", "_")}/{pool_2[0]}").resize((512, 512)))
+        initial = ImageTk.PhotoImage(
+            Image.open(f"assets/{local_team.lower().replace(" ", "_")}/{pool_2[0]}").resize((512, 512)))
     main_window.initial = initial
     current_player["image"] = initial
     coin.grid(row=0, column=0)
     title.grid(row=0, column=1)
     current_player.grid(row=1, column=0, sticky="nsew", columnspan=2)
     select_button.grid(row=2, column=0, sticky="nsew", columnspan=2)
-    new_win.bind("<Key>", lambda e: close_window(e, win, win_to_deiconify=main_window))   
-    thread = threading.Thread(target=change_image, args=(current_player, local_team, teams.index(local_team), teams, title, play))
+    new_win.bind("<Key>", lambda e: close_window(e, win, win_to_deiconify=main_window))
+    thread = threading.Thread(target=change_image,
+                              args=(current_player, local_team, teams.index(local_team), teams, title, play))
     thread.start()
+
 
 def change_image(label, local_team, team_index, teams, title, button):
     global selected
@@ -247,19 +255,22 @@ def change_image(label, local_team, team_index, teams, title, button):
     title_list = ["artillero", "portero"]
     for pool in range(2):
         print(f"{pool=} {team_index=}")
-        title["text"] = f"Seleccione el {title_list[pool]} para {teams[team_index-pool]}"
+        title["text"] = f"Seleccione el {title_list[pool]} para {teams[team_index - pool]}"
         while not selected:
             try:
                 img = ""
                 image = None
                 if pool == 0:
-                    get_pot_value = int(update_data("00\r")[1]) # Para el potenciómetro  
-                    img = pool_1[get_pot_value-1]
-                    image = ImageTk.PhotoImage(Image.open(f"assets/{local_team.lower().replace(" ", "_")}/{img}").resize((512, 512)))
+                    get_pot_value = int(update_data("00\r")[1])  # Para el potenciómetro
+                    img = pool_1[get_pot_value - 1]
+                    image = ImageTk.PhotoImage(
+                        Image.open(f"assets/{local_team.lower().replace(" ", "_")}/{img}").resize((512, 512)))
                 else:
-                    get_pot_value = int(update_data("00\r")[1]) # Para el potenciómetro  
-                    img = pool_2[get_pot_value-1]
-                    image = ImageTk.PhotoImage(Image.open(f"assets/{teams[team_index-1].lower().replace(" ", "_")}/{img}").resize((512, 512)))
+                    get_pot_value = int(update_data("00\r")[1])  # Para el potenciómetro
+                    img = pool_2[get_pot_value - 1]
+                    image = ImageTk.PhotoImage(
+                        Image.open(f"assets/{teams[team_index - 1].lower().replace(" ", "_")}/{img}").resize(
+                            (512, 512)))
                 setattr(main_window, f"a{random.randint(0, 999)}", image)
                 label["image"] = image
             except Exception as e:
@@ -267,6 +278,67 @@ def change_image(label, local_team, team_index, teams, title, button):
 
         selected = False
 
+
+def play_game(win, artillero, equipo):
+    global team_1, team_2
+    win.withdraw()
+    level_window = tk.Toplevel(main_window)
+    level_window.attributes("-fullscreen", True)
+    level_window.attributes("-topmost", True)
+
+    canva_juego = tk.Canvas(
+        level_window,
+        bd=0,
+        highlightthickness=0,
+        width=1920,
+        height=1080
+    )
+
+    background = ImageTk.PhotoImage(Image.open("assets/back.png"))
+
+    pito_sfx = pygame.mixer.Sound("assets/pito.mp3")
+    gol_sfx = pygame.mixer.Sound("assets/gol.mp3")
+    abucheo_sfx = pygame.mixer.Sound("assets/abucheo.mp3")
+    pito_sfx.play()
+
+    canva_juego.create_image(
+        0, 0,
+        image=background,
+        anchor="nw"
+    )
+    done = False
+    goles, cobros = 0, 0
+
+    while not done:
+        try:
+            is_goal = "1" in update_data("000\r")
+            cobros += 1
+
+            if equipo == team_1["name"]:
+                goles, cobros = team_1["jugadores"][artillero]
+                if is_goal:
+                    goles += 1
+                    gol_sfx.play()
+                else:
+                    abucheo_sfx.play()
+                cobros += 1
+                team_1["jugadores"][artillero] = [goles, cobros]
+
+            elif equipo == team_2["name"]:
+                goles, cobros = team_2["jugadores"][artillero]
+
+                if is_goal:
+                    goles += 1
+                    gol_sfx.play()
+                else:
+                    abucheo_sfx.play()
+                cobros += 1
+
+                team_2["jugadores"][artillero] = [goles, cobros]
+            done = True
+
+        except Exception as e:
+            messagebox.showerror("Error interno", f"{e}: Tire la bola de nuevo.")
 
 
 def on_team_select(team, label):
@@ -276,24 +348,24 @@ def on_team_select(team, label):
             team_1 = {
                 "name": "Steins Gate",
                 "jugadores": {
-                    "faris": 0,
-                    "itaru": 0,
-                    "kurisu": 0,
-                    "okabe": 0,
-                    "ruka": 0,
-                    "suzuha": 0
+                    "faris": [0, 0],
+                    "itaru": [0, 0],
+                    "kurisu": [0, 0],
+                    "okabe": [0, 0],
+                    "ruka": [0, 0],
+                    "suzuha": [0, 0]
                 }
             }
         else:
             team_2 = {
                 "name": "Steins Gate",
                 "jugadores": {
-                    "faris": 0,
-                    "itaru": 0,
-                    "kurisu": 0,
-                    "okabe": 0,
-                    "ruka": 0,
-                    "suzuha": 0
+                    "faris": [0, 0],
+                    "itaru": [0, 0],
+                    "kurisu": [0, 0],
+                    "okabe": [0, 0],
+                    "ruka": [0, 0],
+                    "suzuha": [0, 0]
                 }
             }
     elif team == 2:
@@ -301,24 +373,24 @@ def on_team_select(team, label):
             team_1 = {
                 "name": "One Piece",
                 "jugadores": {
-                    "luffy": 0,
-                    "chopper": 0,
-                    "jinbe": 0,
-                    "sanji": 0,
-                    "zoro": 0,
-                    "kuma": 0
+                    "luffy": [0, 0],
+                    "chopper": [0, 0],
+                    "jinbe": [0, 0],
+                    "sanji": [0, 0],
+                    "zoro": [0, 0],
+                    "kuma": [0, 0]
                 }
             }
         else:
             team_2 = {
                 "name": "One Piece",
                 "jugadores": {
-                    "luffy": 0,
-                    "chopper": 0,
-                    "jinbe": 0,
-                    "sanji": 0,
-                    "zoro": 0,
-                    "kuma": 0
+                    "luffy": [0, 0],
+                    "chopper": [0, 0],
+                    "jinbe": [0, 0],
+                    "sanji": [0, 0],
+                    "zoro": [0, 0],
+                    "kuma": [0, 0]
                 }
             }
     elif team == 3:
@@ -326,24 +398,24 @@ def on_team_select(team, label):
             team_1 = {
                 "name": "Jojos",
                 "jugadores": {
-                    "giorno": 0,
-                    "jhonny": 0,
-                    "jolyne": 0,
-                    "joseph": 0,
-                    "josuke": 0,
-                    "jotaro": 0
+                    "giorno": [0, 0],
+                    "jhonny": [0, 0],
+                    "jolyne": [0, 0],
+                    "joseph": [0, 0],
+                    "josuke": [0, 0],
+                    "jotaro": [0, 0]
                 }
             }
         else:
             team_2 = {
                 "name": "Jojos",
                 "jugadores": {
-                    "giorno": 0,
-                    "jhonny": 0,
-                    "jolyne": 0,
-                    "joseph": 0,
-                    "josuke": 0,
-                    "jotaro": 0
+                    "giorno": [0, 0],
+                    "jhonny": [0, 0],
+                    "jolyne": [0, 0],
+                    "joseph": [0, 0],
+                    "josuke": [0, 0],
+                    "jotaro": [0, 0]
                 }
             }
     if new:
@@ -386,8 +458,5 @@ title.pack()
 start_button.pack()
 about_button.pack()
 exit_button.pack()
-#pygame.mixer.init()
-#pygame.mixer.music.load('api/assets/music/menumusic.mp3')
-#pygame.mixer.music.play(loops=-1)
 main_window.bind('<Key>', lambda e: close_window(e, main_window))
 main_window.mainloop()
