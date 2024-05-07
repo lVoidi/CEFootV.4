@@ -215,6 +215,16 @@ def on_game_start(win):
         command=select,
         font=("04b", 40)
     )
+
+    play = tk.Button(
+        new_win,
+        text="Jugar",
+        bd=0,
+        relief="flat",
+        command=select,
+        font=("04b", 40)
+    )
+
     initial = None
     if local_team == teams[0]:
         initial = ImageTk.PhotoImage(Image.open(f"assets/{local_team.lower().replace(" ", "_")}/{pool_1[0]}").resize((512, 512)))
@@ -230,7 +240,7 @@ def on_game_start(win):
     thread = threading.Thread(target=change_image, args=(current_player, local_team, teams.index(local_team), teams, title, play))
     thread.start()
 
-def change_image(label, local_team, team_index, teams, title):
+def change_image(label, local_team, team_index, teams, title, button):
     global selected
     pool_1 = [f"{key}.jpg" for key in team_1["jugadores"].keys()]
     pool_2 = [f"{key}.jpg" for key in team_2["jugadores"].keys()]
