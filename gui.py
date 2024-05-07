@@ -88,6 +88,72 @@ Luis Barboza Artavia.
     win.bind("<Key>", lambda e: close_window(e, win, win_to_deiconify=main_window))
 
 
+def preeliminares_page():
+    main_window.withdraw()
+    win = tk.Toplevel(main_window)
+    win.config(bg="#000000")
+    win.attributes("-fullscreen", True)
+    win.attributes("-topmost", True)
+
+    titulo = tk.Label(
+        win,
+        text="Preeliminares",
+        fg="#aaaaff",
+        pady=80,
+        bg="#000000",
+        bd=0,
+        relief="flat",
+        font=("04b", 50)
+    )
+
+    info = tk.Label(
+        win,
+        text="""
+La relación entre el concepto de “Internet of Things” y Computación Ubicua es muy directa.
+Los dispositivos computacionales incorporados en los elementos del ambiente es el concepto
+detrás de Computación Ubicua tal como lo planteó Mark Weiser en XeroxPARC hace más de
+33 años. (Weiser M, "The Computer for the Twenty-First Century," Scientific American, pp. 94-
+10, September 1991).
+Una de las motivaciones para los estudiantes de Ingeniería en Computadores, en su primer
+semestre, es construir una maqueta de un juguete, que interactúe con el computador, esto
+sería una versión moderna de los juegos de mesa. Inspirado en proyectos de años pasados,
+aunado con el evento femenino de la copa de oro, se plantea un nuevo prototipo de Juego,
+que se promociona como una nueva especie de juegos de mesa, ya que no solo es una consola
+o un elemento virtual para compartir tal como lo hacían en antaño los juegos de mesa.
+Se trae a colación la frase de un prominente aficionado a los juegos de mesa, de espíritu
+competitivo: “lo importante no es tanto ganar, sino que el verdadero placer está en humillar al
+derrotado” J.E.H.). Si a estos juegos hechos en casa, se les permea con tecnología de bajo
+costo basada en microcontroladores, quizás se conserve entonces la magia del espacio de
+socialización, evitando así el aislamiento asociado a las consolas de video juego clásicas. De
+esta forma se pueden revitalizar aquellos juegos con los que padres y abuelos disfrutaron.
+Esta versión con tecnología computacional se ha bautizado como CEFoot Ver 4.
+El proyecto se debe realizar en grupo de dos (o uno) con Python, hecho que se debe especificar
+en la opción “Acerca de” del producto.
+Se plantea como el desarrollo de un juego de futbol de mesa conectado al computador con
+efectos de sonidos tales como: de celebración de gol, porras, abucheos, pito del árbitro,
+además se mostrará dos fotos una de cada jugador(a) (programador(a)), correspondiente a
+cada equipo.
+Se recomienda que el tamaño del futbolín sea de un máximo de 17”x 22”. Existe interacción
+entre la maqueta y el computador, es decir eventos generados en el computador (indicador de
+apoyo de la afición) se envían como señal a la maqueta o la maqueta puede mandar señales
+al computador, como por ejemplo la detección de un gol.
+Este proyecto requiere poner sus habilidades de programación y en la conexión de circuitos
+individual, así como una dinámica adecuada de trabajo en grupo, además de desarrollar
+destreza para documentación, encontrar soluciones y resolver problemas en grupo
+             """,
+        fg="#ffffff",
+        justify="center",
+        bg="#000000",
+        bd=0,
+        relief="flat",
+        font=("04b", 12)
+    )
+
+    titulo.pack()
+    info.pack()
+    win.bind("<Key>", lambda e: close_window(e, win, win_to_deiconify=main_window))
+
+
 team_1 = {
     "name": "",
     "jugadores": {},
@@ -294,8 +360,34 @@ def change_image(label, local_team, team_index, teams, title, button):
     button["state"] = "active"
 
 
+ganador = ""
+
+
+def win_window():
+    level_window = tk.Toplevel(main_window)
+    level_window.config(bg="#000000")
+    level_window.attributes("-fullscreen", True)
+    level_window.attributes("-topmost", True)
+    if ganador == team_1["name"]:
+        label = tk.Label(
+            level_window,
+            text=f"""
+            Ganador:
+            {team_1}
+            """
+        )
+    else:
+        label = tk.Label(
+            level_window,
+            text=f"""
+            Ganador
+            {team_2}
+        """
+        )
+
+
 def play_game(win, artillero, equipo):
-    global team_1, team_2
+    global team_1, team_2, ganador
     win.destroy()
     level_window = tk.Toplevel(main_window)
     level_window.config(bg="#000000")
@@ -310,6 +402,28 @@ def play_game(win, artillero, equipo):
         height=1080
     )
 
+    canvas_team_actual = 0
+
+    if equipo == team_1["name"]:
+        goles, cobros = team_1["goles"]
+        if goles > 3 or (team_2["goles"][0] < goles and cobros == 5):
+            ganador = equipo
+            win_window()
+        canvas_team_actual = canva_juego.create_text(
+            100, 1080 / 2,
+            text=f"{goles}",
+            font=("04b", 40)
+        )
+    else:
+        goles, cobros = team_2["goles"]
+        if goles > 3 or (team_1["goles"][0] < goles and cobros == 5):
+            ganador = equipo
+            win_window()
+        canvas_team_actual = canva_juego.create_text(
+            100, 1080 / 2,
+            text=f"{goles}",
+            font=("04b", 40)
+        )
     background = ImageTk.PhotoImage(Image.open("assets/back.png"))
     level_window.b = background
 
@@ -324,7 +438,9 @@ def play_game(win, artillero, equipo):
     canva_juego.pack()
     t = threading.Thread(target=check_goal, args=(artillero, equipo, gol_sfx, abucheo_sfx, level_window))
     t.start()
-def check_goal(artillero, equipo, gol_sfx, abucheo_sfx, level_window: tk.Toplevel):
+
+
+def check_goal(artillero, equipo, level_window: tk.Toplevel):
     done = False
     goles, cobros = 0, 0
     while not done:
@@ -351,7 +467,6 @@ def check_goal(artillero, equipo, gol_sfx, abucheo_sfx, level_window: tk.Topleve
                 else:
                     abucheo_sfx.play()
                 cobros += 1
-
                 team_2["jugadores"][artillero] = [goles, cobros]
             print(goles, cobros, equipo, is_goal)
             done = True
@@ -359,6 +474,7 @@ def check_goal(artillero, equipo, gol_sfx, abucheo_sfx, level_window: tk.Topleve
             on_game_start(main_window, equipo)
         except Exception as e:
             messagebox.showerror("Error interno", f"{e}: Tire la bola de nuevo.")
+
 
 def on_team_select(team, label):
     global team_1, team_2, new
@@ -469,6 +585,16 @@ about_button = tk.Button(
     command=about_page,
     font=("04b", 40)
 )
+preeliminares = tk.Button(
+    main_window,
+    text="Preeliminares",
+    fg="#ffffff",
+    bg="#000000",
+    bd=0,
+    relief="flat",
+    command=preeliminares_page,
+    font=("04b", 40)
+)
 exit_button = tk.Button(
     main_window,
     text="Salir",
@@ -482,6 +608,7 @@ exit_button = tk.Button(
 title.pack()
 start_button.pack()
 about_button.pack()
+preeliminares.pack()
 exit_button.pack()
 main_window.bind('<Key>', lambda e: close_window(e, main_window))
 main_window.mainloop()
