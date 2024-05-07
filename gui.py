@@ -247,7 +247,6 @@ def on_game_start(win, last_team=""):
     global selected, team_1, team_2
     if not (team_1["name"] and team_2["name"]):
         return
-    win.withdraw()
 
     new_win = tk.Toplevel(main_window)
 
@@ -403,6 +402,16 @@ def play_game(win, artillero, equipo):
     )
 
     canvas_team_actual = 0
+    background = ImageTk.PhotoImage(Image.open("assets/back.png"))
+    level_window.b = background
+
+    pito_sfx.play()
+
+    canva_juego.create_image(
+        0, 0,
+        image=background,
+        anchor="nw"
+    )
 
     if equipo == team_1["name"]:
         goles, cobros = team_1["goles"]
@@ -424,19 +433,9 @@ def play_game(win, artillero, equipo):
             text=f"{goles}",
             font=("04b", 40)
         )
-    background = ImageTk.PhotoImage(Image.open("assets/back.png"))
-    level_window.b = background
-
-    pito_sfx.play()
-
-    canva_juego.create_image(
-        0, 0,
-        image=background,
-        anchor="nw"
-    )
 
     canva_juego.pack()
-    t = threading.Thread(target=check_goal, args=(artillero, equipo, gol_sfx, abucheo_sfx, level_window))
+    t = threading.Thread(target=check_goal, args=(artillero, equipo, level_window))
     t.start()
 
 
@@ -471,7 +470,7 @@ def check_goal(artillero, equipo, level_window: tk.Toplevel):
             print(goles, cobros, equipo, is_goal)
             done = True
             level_window.after(5000, level_window.destroy)
-            on_game_start(main_window, equipo)
+            level_window.after(5000, lambda: on_game_start(main_window, equipo))
         except Exception as e:
             messagebox.showerror("Error interno", f"{e}: Tire la bola de nuevo.")
 
