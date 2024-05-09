@@ -1,16 +1,9 @@
-from machine import Pin, ADC, UART
+from machine import Pin, ADC
 import network
-import _thread
+import json
 import random
 import socket
 import time
-import uos 
-
-data_pin = Pin(13, Pin.OUT)
-latch_pin = Pin(15, Pin.OUT)
-clock_pin = Pin(14, Pin.OUT)
-
-
 
 # Boton del team y leds
 change_player_signal = Pin(28, Pin.IN, Pin.PULL_UP)
@@ -62,12 +55,7 @@ def listen_to_goal(goalkeeper_indices, cl, addr):
         values = [
             button.value() for button in goal_buttons
         ]
-    goal = ""
-    for i in range(6):
-        if i in goalkeeper_indices:
-            goal += "1"
-        else:
-            goal += "0"
+
     is_goal = True
     pressed = False
     for index, value in enumerate(values):
@@ -84,15 +72,31 @@ def listen_to_goal(goalkeeper_indices, cl, addr):
     elif pressed and not is_goal:
         prefix = "0"
 
-    code = prefix# + f"{pressed_button_index}"
+    code = prefix
     if pressed:
         goal_leds[pressed_button_index].value(1)
-        send_code(code, cl, addr, timeout=0)
-        print(pressed_button_index, goal_leds[pressed_button_index])
-        time.sleep(3)
+        send_code(code, cl)
+        time.sleep(1.5)
         goal_leds[pressed_button_index].value(0)
-    
-    
+
+    if not is_goal:
+        for _ in range(10):  
+            for led in goal_leds:
+                led.value(1)
+            time.sleep(0.1)
+            for led in goal_leds:
+                led.value(0) 
+            time.sleep(0.1)
+    else:
+        leds = goal_leds
+        for _ in range(10):
+            for led in leds:
+                led.value(1)
+                time.sleep(0.05)
+            leds.reverse()
+            for led in leds:
+                led.value(0) 
+                time.sleep(0.05)
 
 def main():
     global blue_team, code, red_team, current_team_playing
@@ -102,47 +106,38 @@ def main():
 
     s = socket.socket()
     s.bind(addr)
-    s.listen(1)
-    s.settimeout(100)
+    s.listen(100)
     print(f"[DEBUG] Escuchando al puerto 8080, en {addr}")
     goal = [i for i in range(6)]
     while True:
         cl, addr = s.accept()
+        cl_file = cl.makefile('rwb', 0)
+        while True:
+            line = cl_file.readline()
+            print(line)
+            if not line or line == b'\r\n':
+                break
         print(f"[DEBUG] Cliente conectado desde: {addr} ")
-        request = cl.recv(1024).decode().upper().split("\n")
-        signal = ""
-        for request_content in request:
-            if "LENGTH" in request_content:
-                request_content = request_content.split(":")[1]
-                if "2" in request_content:
-                    signal = "SIGTEAM"
-                elif "3" in request_content:
-                    signal = "SIGPOT"       
-                else:
-                    signal = "SIGGOAL"
+        request = cl.recv(1024).decode().upper()
+        signal = request.upper()
+        
         print(signal)
         if signal == "SIGTEAM":
-            selected = False
-            while not selected:
-                print(selected)
+            while True:
                 if change_player_signal.value() and current_team_playing == "blue":
+                    send_code("1", cl)
                     current_team_playing = "red"
-                    selected = True
                     blue_team.value(0)
                     red_team.value(1)
+                    break
                 elif change_player_signal.value() and current_team_playing == "red":
+                    send_code("0", cl)
                     current_team_playing = "blue"
-                    selected = True
                     blue_team.value(1)
                     red_team.value(0)
-            print("sending code")
-            if current_team_playing == "blue":
-                send_code(f"C:1", cl, addr)
-            else:
-                send_code(f"C:0", cl, addr)
-            time.sleep(0.25)
+                    break
         elif signal  == "SIGPOT":
-            send_code(f"C:{return_pot_val()}", cl, addr)
+            send_code(f"{return_pot_val()}", cl)
         elif signal == "SIGGOAL":
             anotation_algorithm = random.randint(1, 3)
 
@@ -170,28 +165,24 @@ def main():
 
             code = listen_to_goal(index_list, cl, addr)
 
-def send_code(code, client, address, timeout=0):
-    if timeout > 5:
-        cl_file = client.makefile('r')
-        while True:
-            line = cl_file.readline()
-            if not line or line == b'\r\n':
-                break
+def send_code(code, client):
     print(f'enviando {code}')
     client.send('HTTP/1.0 200 OK\r\n\r\n')
     print('enviando dato')
-    client.sendall(code.encode())
+    client.send(code.encode())
     print('cerrando')
     client.close()
 
 def do_connect():
+    debug_pin = Pin(20, Pin.OUT)
     sta_if = network.WLAN(network.STA_IF)
     if not sta_if.isconnected():
         print('connecting to network...')
         sta_if.active(True)
-        sta_if.connect("gary", "Brinco2020")
+        sta_if.connect("Senora de lo Angeles", "44556677")
         while not sta_if.isconnected():
             pass
+    debug_pin.value(1)
     print('network config:', sta_if.ifconfig())
 
 
