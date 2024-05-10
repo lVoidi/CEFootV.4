@@ -1,14 +1,46 @@
+# noinspection SpellCheckingInspection
 # Arrow icon: https://www.flaticon.com/free-icon/next_2885955?term=pixel+arrow&page=1&position=1&origin=search&related_id=2885955
 from comunicate import update_data
 from PIL import Image, ImageTk
+from pathlib import Path
 from tkinter import messagebox
 import tkinter as tk
 import threading
 import random
 import pygame
+import os
 
 
-# noinspection SpellCheckingInspection
+class Player:
+    def __init__(self, name):
+        self.name = name
+        self.score = 0
+        self.shots = 0
+
+
+class Goalie:
+    def __init__(self, name):
+        self.name = name
+        self.saved = 0
+
+
+class Team:
+    def __init__(self, name: str):
+        self.name = name
+        self.score = 0
+        self.path = Path(f"assets/{name}/")
+        self.wallpaper = self.path.joinpath("wall.jpg")
+        self.goalies_path = self.path.joinpath("goalie")
+        self.players_path = self.path.joinpath("player")
+        self.goalies = []
+        self.players = []
+        for name in os.listdir(self.goalies_path):
+            self.goalies.append(Goalie(name.replace(".jpg", "")))
+        for name in os.listdir(self.players_path):
+            self.players.append(Player(name.replace(".jpg", "")))
+
+
+
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -43,6 +75,11 @@ class MainWindow(tk.Tk):
         background_widget.place(x=0, y=0)
         start_button.place(x=360, y=840)
         about_button.place(x=1150, y=840)
+
+        self.red_team: Team = Team("")
+        self.blue_team: Team = Team("")
+        self.current_team_playing: Team = self.blue_team
+
         self.bind("<Key>", lambda e: self.close(e))
 
     def image(self, name, resolution):
@@ -100,7 +137,7 @@ class MainWindow(tk.Tk):
         background_widget.place(x=128, y=0)
 
 
-
-
-root = MainWindow()
-root.mainloop()
+t = Team("Barcelona")
+print(t.goalies)
+#root = MainWindow()
+#root.mainloop()
