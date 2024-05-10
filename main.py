@@ -42,7 +42,7 @@ goal_leds = [
 pot = ADC(26)
 
 def return_pot_val():
-    return int((pot.read_u16()/65535)*100)//16
+    return int((pot.read_u16()/65535)*100)//50
 
 def listen_to_goal(goalkeeper_indices, cl, addr):
     global blue_team,red_team
