@@ -80,13 +80,14 @@ class MainWindow(tk.Tk):
 
         self.red_team: Team = None
         self.blue_team: Team = None
+        self.defending_team: Team = None
+        self.current_team_playing: Team = None
         self.is_red_selected = False
         self.is_blue_selected = False
         self.blue_team_widget = None
         self.red_team_widget = None
         self.team_selecting_title = None
         self.teams_pool = [Team("Barcelona"), Team("Manchester United"), Team("Real Madrid")]
-        self.current_team_playing: Team = None
         self.bind("<Key>", lambda e: self.close(e))
 
     def image(self, name, resolution):
@@ -235,6 +236,7 @@ class MainWindow(tk.Tk):
 
         if not self.current_team_playing:
             self.current_team_playing = random.choice((self.blue_team, self.red_team))
+        self.defending_team = self.blue_team if self.current_team_playing != self.blue_team_widget else self.red_team
         title = tk.Label(
             coin_window,
             text=f"{self.current_team_playing.name} Inicia",
@@ -255,15 +257,48 @@ class MainWindow(tk.Tk):
         coin.pack()
         coin_window.attributes("-topmost", True)
         coin_window.attributes("-fullscreen", True)
-        coin_animation = threading.Thread(target=self.animate_coin, args=(frames, coin,))
+        coin_animation = threading.Thread(target=self.animate_coin, args=(frames, coin, coin_window,))
         coin_animation.start()
 
-    def animate_coin(self, frames, coin):
+    def animate_coin(self, frames, coin, master):
         initial_time = time.time()
         while 0 <= time.time() - initial_time <= 5:
             for frame in frames:
                 coin["image"] = frame
                 time.sleep(0.05)
+        master.destroy()
+
+    def select_player(self):
+        local_window = tk.Toplevel(self)
+        local_window.config(
+            bg="#000000"
+        )
+
+        player_image = self.image(self.current_team_playing.players[0].path, (512, 512))
+        goalie_image = self.image(self.defending_team.goalies[0].path, (512, 512))
+
+
+        local_window.attributes("-fullscreen", True)
+        local_window.attributes("-topmost", True)
+        selecting_player_thread = threading.Thread(target=self.selecting_player, args=(local_window,))
+        selecting_player_thread.start()
+
+    def selecting_player(self, master):
+        while not self.is_blue_selected:
+            pot_value = int(update_data("SIGPOT"))
+            self.blue_team = self.teams_pool[pot_value]
+            blue_team_image = self.image(self.blue_team.logo, (512, 512))
+            self.blue_team_widget["image"] = blue_team_image
+            time.sleep(0.2)
+
+        self.team_selecting_title["text"] = "Seleccionando: Rojo"
+
+        while not self.is_red_selected:
+            pot_value = int(update_data("SIGPOT"))
+            self.red_team = self.teams_pool[pot_value]
+            red_team_image = self.image(self.red_team.logo, (512, 512))
+            self.red_team_widget["image"] = red_team_image
+            time.sleep(0.2)
 
 
 root = MainWindow()
