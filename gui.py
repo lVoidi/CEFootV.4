@@ -3,13 +3,70 @@
 from comunicate import update_data
 from PIL import Image, ImageTk
 from pathlib import Path
-from tkinter import messagebox
 import tkinter as tk
 import threading
+import json
 import random
 import time
 import pygame
 import os
+
+DEFAULT = {
+    "Manchester United": {
+        "score": 0,
+        "shots": 0,
+        "scores": {
+            "Cavani": {
+                "score": 0,
+                "shots": 0
+            },
+            "harry": {
+                "score": 0,
+                "shots": 0
+            },
+            "RonaldoMU": {
+                "score": 0,
+                "shots": 0
+            }
+        }
+    },
+    "Barcelona": {
+        "score": 0,
+        "shots": 0,
+        "scores": {
+            "Lewi": {
+                "score": 0,
+                "shots": 0
+            },
+            "Neymar": {
+                "score": 0,
+                "shots": 0
+            },
+            "Pessi": {
+                "score": 0,
+                "shots": 0
+            }
+        }
+    },
+    "Real Madrid": {
+        "score": 0,
+        "shots": 0,
+        "scores": {
+            "Bale": {
+                "score": 0,
+                "shots": 0
+            },
+            "Ronaldo": {
+                "score": 0,
+                "shots": 0
+            },
+            "Vinicius": {
+                "score": 0,
+                "shots": 0
+            }
+        }
+    }
+}
 
 
 class Player:
@@ -51,25 +108,33 @@ class Team:
                                                                         "").replace("jpeg", ""),
                                        self.players_path.joinpath(name)))
 
+    def get_stats(self):
+        pass
+
 
 def movement_ratio(x):
-    return -x * (x - 1.5)
+    return -1.778 * x * (x - 1.5)
 
 
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
+        self.ball_image_id = None
         pygame.mixer.init()
         pygame.mixer.music.load("assets/bgmusic.mp3")
         pygame.mixer.music.play(loops=-1)
-        pygame.mixer.music.set_volume(0.5)
+        pygame.mixer.music.set_volume(1.0)
         # Constantes
         self.wm_attributes('-alpha', 0.5)
         self.ON_FAIL = pygame.mixer.Sound("assets/abucheo.mp3")
         self.ON_GOAL = pygame.mixer.Sound("assets/gol.mp3")
+        self.ON_SHOT = pygame.mixer.Sound("assets/shot.mp3")
+        self.ON_EXPLOSION = pygame.mixer.Sound("assets/explosion.mp3")
         self.ON_START = pygame.mixer.Sound("assets/pito.mp3")
         self.ON_SELECT = pygame.mixer.Sound("assets/select.mp3")
         self.image_counter = 0
+        self.ball = 0
+        self.shooting_points = []
         # Configuración inicial
         self.config(
             bg="#000000",
@@ -118,6 +183,85 @@ class MainWindow(tk.Tk):
         setattr(self, f"img{self.image_counter}", image)
         self.image_counter += 1
         return image
+
+    def show_stats(self):
+        local_window = tk.Toplevel(self)
+        local_window.config(
+            bg="#000000",
+            width=1920,
+            height=1080
+        )
+
+        title = tk.Label(
+            text="Estadísticas",
+            pady=50,
+            fg="#ffffff",
+            bg="#000000",
+            font=("04b", 60)
+        )
+        stats = {}
+        with open("stats.json", "wr") as file:
+            stats_file = file.read()
+            stats = json.loads(stats_file)
+
+        local_team_name = self.current_team_playing.name
+        defending_team_name = self.defending_team.name
+
+        old_stats = stats
+
+        for player in self.current_team_playing.players:
+            stats[local_team_name]["scores"][player.name] = {
+                "score": player.score + old_stats[local_team_name]["scores"][player.name]["score"],
+                "shots": player.shots + old_stats[local_team_name]["scores"][player.name]["shots"],
+            }
+
+        stats[local_team_name]["score"] = old_stats[local_team_name]["score"] + self.current_team_playing.score
+        stats[local_team_name]["shots"] = old_stats[local_team_name]["shots"] + self.current_team_playing.shot
+
+        for player in self.defending_team.players:
+            stats[defending_team_name]["scores"][player.name] = {
+                "score": player.score + old_stats[defending_team_name]["scores"][player.name]["score"],
+                "shots": player.shots + old_stats[defending_team_name]["scores"][player.name]["shots"],
+            }
+
+        stats[defending_team_name]["score"] = old_stats[defending_team_name]["score"] + self.defending_team.score
+        stats[defending_team_name]["shots"] = old_stats[defending_team_name]["shots"] + self.defending_team.shot
+
+        new_stats = json.dumps(stats)
+        with open("stats.json") as file:
+            file.write(new_stats)
+        best_local = sorted(stats[local_team_name]["scores"],
+                            key=lambda x: x[1]['score'], reverse=True)
+
+        best_defending = sorted(stats[defending_team_name]["scores"],
+                                key=lambda x: x[1]['score'], reverse=True)
+
+        local_team_best = best_local[:3]
+        defending_best = best_defending[:3]
+
+        text_local = ""
+        for player in best_local:
+            score = stats[local_team_name]["scores"][player]["score"]
+            shots = stats[local_team_name]["scores"][player]["shots"]
+            percent = (score/shots)*100
+            text_local += f"""
+{player}: {shots} tiros y {score} goles: {percent}%
+            """
+
+        info_local = tk.Label(
+            text=f"""
+Tiros: {stats[local_team_name]["shots"]}
+Goles: {stats[local_team_name]["score"]}
+% de anotación: {(stats[local_team_name]["score"]/stats[local_team_name]["shots"])*100}
+-----------------
+Mejores jugadores:
+{text_local}
+            """
+        )
+
+        title.grid(row=0, column=0, columnspan=1, sticky="nsew", expand=tk.BOTH)
+        local_window.attributes("-fullscreen", True)
+        local_window.attributes("-topmost", True)
 
     def button(self, text, on_activation, master=None):
         button_widget = tk.Button(
@@ -227,24 +371,29 @@ class MainWindow(tk.Tk):
 
     def selecting_team(self, master):
         while not self.is_team_selected:
-            pot_value = int(update_data("SIGPOT"))
+            try:
+                pot_value = int(update_data("SIGPOT"))
+            except:  # La única excepcion print(self.shooting_points, index, final_coords):
+                continue
             self.blue_team = self.teams_pool[pot_value]
             blue_team_image = self.image(self.blue_team.logo, (512, 512))
             self.blue_team_widget["image"] = blue_team_image
-            time.sleep(0.2)
+            time.sleep(1)
 
         self.is_team_selected = False
         self.team_selecting_title["text"] = "Seleccionando: Rojo"
 
         while not self.is_team_selected:
-            pot_value = int(update_data("SIGPOT"))
+            try:
+                pot_value = int(update_data("SIGPOT"))
+            except:  # La única excepcion print(self.shooting_points, index, final_coords):
+                continue
             self.red_team = self.teams_pool[pot_value]
             red_team_image = self.image(self.red_team.logo, (512, 512))
             self.red_team_widget["image"] = red_team_image
-            time.sleep(0.2)
+            time.sleep(1)
         self.is_team_selected = False
         master.destroy()
-        time.sleep(1)
         self.open_coin_window()
 
     def set_team(self):
@@ -346,22 +495,28 @@ class MainWindow(tk.Tk):
 
     def selecting_player(self, master):
         while not self.is_player_selected:
-            pot_value = int(update_data("SIGPOT"))
+            try:
+                pot_value = int(update_data("SIGPOT"))
+            except:  # La única excepcion print(self.shooting_points, index, final_coords):
+                continue
             player = self.current_team_playing.players[pot_value]
             self.current_team_playing.player = player
             player_image = self.image(player.path, (512, 512))
             self.player_widget["image"] = player_image
             self.player_title["text"] = f"{self.current_team_playing.name}: {player.name}"
-            time.sleep(0.2)
+            time.sleep(1)
         self.is_player_selected = False
         while not self.is_player_selected:
-            pot_value = int(update_data("SIGPOT"))
+            try:
+                pot_value = int(update_data("SIGPOT"))
+            except:  # La única excepcion print(self.shooting_points, index, final_coords):
+                continue
             goalie = self.defending_team.goalies[pot_value]
             self.defending_team.goalie = goalie
             goalie_image = self.image(goalie.path, (512, 512))
             self.goalie_widget["image"] = goalie_image
             self.player_title["text"] = f"{self.defending_team.name}: {goalie.name}"
-            time.sleep(0.2)
+            time.sleep(1)
         self.is_player_selected = False
         master.destroy()
         self.start_playing()
@@ -394,7 +549,7 @@ class MainWindow(tk.Tk):
         )
 
         ball = self.image("assets/ball.png", (128, 128))
-        ball_image = game_canvas.create_image(
+        self.ball = game_canvas.create_image(
             960, 975,
             image=ball,
             anchor="center"
@@ -410,6 +565,8 @@ class MainWindow(tk.Tk):
             goal_division.append(
                 [initial, y0, initial + goal_anchor, y1]
             )
+            if 0 <= len(self.shooting_points) <= 5:
+                self.shooting_points.append([(2 * initial + goal_anchor) // 2, (y0 + y1) // 2])
             initial += goal_anchor
 
         penalties_blue, penalties_red = [], []
@@ -484,13 +641,16 @@ class MainWindow(tk.Tk):
         self.ON_START.play()
         initial_time = time.time()
         listener = update_data("SIGGOAL")
-        is_goal, index, goalie = listener.split(":")
-        for index, division in enumerate(self.divisions):
-            if goalie[index] == "1":
-                self.game_canvas.itemconfig(division, fill="#aaaaaa")
-        time.sleep(1.5)
 
-        if is_goal == "1" and time.time() - initial_time <= 5:
+        final_time = time.time()
+        is_goal, index, goalie = listener.split(":")
+
+        for i, division in enumerate(self.divisions):
+            if goalie[i] == "1":
+                self.game_canvas.itemconfig(division, fill="#aaaaaa")
+        self.game_canvas.tag_raise(self.ball)
+        self.draw_ball_shot(int(index))
+        if is_goal == "1" and final_time - initial_time <= 5:
             self.ON_GOAL.play()
             title = self.game_canvas.create_text(
                 0, 1080 // 2,
@@ -527,10 +687,13 @@ class MainWindow(tk.Tk):
 
 
         else:
+            text = "ES UN \nP*JA\n DE PORTERO!!!"
+            if final_time - initial_time > 5:
+                text = "Tiro perdido\n POR TIEMPO"
             self.ON_FAIL.play()
             title = self.game_canvas.create_text(
                 0, 1080 // 2,
-                text="ES UN \nP*JA\n DE PORTERO!!!",
+                text=text,
                 fill="#000000",
                 justify="center",
                 anchor="center",
@@ -538,7 +701,7 @@ class MainWindow(tk.Tk):
             )
             title_2 = self.game_canvas.create_text(
                 5, 5 + 1080 // 2,
-                text="ES UN \nP*JA\n DE PORTERO!!!",
+                text=text,
                 justify="center",
                 fill="#ffffff",
                 anchor="center",
@@ -551,7 +714,7 @@ class MainWindow(tk.Tk):
             for i in range(20):
                 self.game_canvas.move(title, 1, 0)
                 self.game_canvas.move(title_2, 1, 0)
-                time.sleep(0.05)
+                time.sleep(0.1)
             for i in range(1000):
                 self.game_canvas.move(title, i, 0)
                 self.game_canvas.move(title_2, i, 0)
@@ -561,9 +724,101 @@ class MainWindow(tk.Tk):
             self.defending_team.goalie.saved += 1
         self.current_team_playing.shot += 1
         time.sleep(3)
+
+        waiting_for_team_change = self.game_canvas.create_text(
+            400, 500,
+            text="PRESIONAR BOTON\n DE\n CAMBIO DE EQUIPO",
+            justify="center",
+            fill="#000000",
+            anchor="nw",
+            font=("04b", 50)
+        )
+        waiting_for_team_change_2 = self.game_canvas.create_text(
+            400 - 5, 500 - 5,
+            text="PRESIONAR BOTON\n DE\n CAMBIO DE EQUIPO",
+            justify="center",
+            fill="#ffffff",
+            anchor="nw",
+            font=("04b", 50)
+        )
+        change_team = update_data("SIGTEAM")
         self.defending_team, self.current_team_playing = self.current_team_playing, self.defending_team
-        master.destroy()
-        self.select_player()
+        if self.defending_team.shot == 5 and self.current_team_playing.shot == 5:
+            self.show_stats()
+            master.destroy()
+        else:
+            master.destroy()
+            self.select_player()
+
+    def draw_ball_shot(self, index):
+        self.ON_SHOT.play()
+        final_coords = self.shooting_points[index]
+        reference = (960, 975)
+        difference_x = final_coords[0] - reference[0]
+        difference_y = final_coords[1] - reference[1]
+        print(self.shooting_points,
+              index, final_coords,
+              difference_y, difference_x, "\n\n\n")
+        initial_time = time.time()
+        t = time.time() - initial_time
+        size = 128
+        angle = 360
+        last_pos = ()
+        while 0 <= t <= 0.75:
+            size = int(128 * (1 - t))
+            ratio = movement_ratio(t)
+            angle = 360 * ratio
+            bias = 50
+            if difference_x < 0:
+                bias = -50
+
+            new_position = (reference[0] + (difference_x + bias) * ratio,
+                            reference[1] + (difference_y - 100) * ratio)
+
+            last_pos = new_position
+            frame = Image.open("assets/ball.png").rotate(angle).resize((size, size))
+            image = ImageTk.PhotoImage(frame)
+            self.ball_image_id = image
+            self.game_canvas.coords(
+                self.ball, *new_position
+            )
+            self.game_canvas.itemconfig(self.ball, image=image)
+            t = time.time() - initial_time
+        size = 32
+        difference_x = final_coords[0] - last_pos[0]
+        difference_y = final_coords[1] - last_pos[1]
+        new_position = ()
+        while 0 <= t <= 1.5:
+            ratio = movement_ratio(t)
+            angle = 360 * ratio
+
+            new_position = (last_pos[0] + difference_x * (1 - ratio),
+                            last_pos[1] + difference_y * (1 - ratio))
+
+            frame = Image.open("assets/ball.png").rotate(-angle).resize((size, size))
+            image = ImageTk.PhotoImage(frame)
+            self.ball_image_id = image
+            self.game_canvas.coords(
+                self.ball, *new_position
+            )
+            self.game_canvas.itemconfig(self.ball, image=image)
+            t = time.time() - initial_time
+
+        self.game_canvas.delete(self.ball)
+        self.ON_EXPLOSION.play()
+        frames = [
+            self.image(f"assets/explosion/fram{n}.png", (256, 256)) for n in range(1, 8)
+        ]
+        explosion_image = self.game_canvas.create_image(
+            *new_position,
+            image=frames[0],
+            anchor="center"
+        )
+        for frame in frames[1:]:
+            self.game_canvas.itemconfig(explosion_image, image=frame)
+            time.sleep(0.15)
+
+        self.game_canvas.delete(explosion_image)
 
 
 root = MainWindow()
