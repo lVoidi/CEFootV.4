@@ -108,9 +108,6 @@ class Team:
                                                                         "").replace("jpeg", ""),
                                        self.players_path.joinpath(name)))
 
-    def get_stats(self):
-        pass
-
 
 def movement_ratio(x):
     return -1.778 * x * (x - 1.5)
@@ -191,16 +188,18 @@ class MainWindow(tk.Tk):
             width=1920,
             height=1080
         )
-
+        ganador = f"{self.defending_team.name}"
+        if self.current_team_playing.score > self.defending_team.score:
+            ganador = f"{self.current_team_playing.name}"
         title = tk.Label(
-            text="Estadísticas",
+            text=f"Ganador: {ganador}",
             pady=50,
             fg="#ffffff",
             bg="#000000",
-            font=("04b", 60)
+            font=("04b", 50)
         )
         stats = {}
-        with open("stats.json", "wr") as file:
+        with open("stats.json") as file:
             stats_file = file.read()
             stats = json.loads(stats_file)
 
@@ -228,12 +227,13 @@ class MainWindow(tk.Tk):
         stats[defending_team_name]["shots"] = old_stats[defending_team_name]["shots"] + self.defending_team.shot
 
         new_stats = json.dumps(stats)
-        with open("stats.json") as file:
+        with open("stats.json", "w") as file:
             file.write(new_stats)
-        best_local = sorted(stats[local_team_name]["scores"],
+
+        best_local = sorted(stats[local_team_name]["scores"].items(),
                             key=lambda x: x[1]['score'], reverse=True)
 
-        best_defending = sorted(stats[defending_team_name]["scores"],
+        best_defending = sorted(stats[defending_team_name]["scores"].items(),
                                 key=lambda x: x[1]['score'], reverse=True)
 
         local_team_best = best_local[:3]
@@ -241,27 +241,67 @@ class MainWindow(tk.Tk):
 
         text_local = ""
         for player in best_local:
-            score = stats[local_team_name]["scores"][player]["score"]
-            shots = stats[local_team_name]["scores"][player]["shots"]
-            percent = (score/shots)*100
+            score = stats[local_team_name]["scores"][player[0]]["score"]
+            shots = stats[local_team_name]["scores"][player[0]]["shots"]
+            percent = 0
+            if shots:
+                percent = (score / shots) * 100
             text_local += f"""
-{player}: {shots} tiros y {score} goles: {percent}%
+{player[0]}
+{shots} tiros
+{score} goles
+{percent}%
             """
 
+        text_defending = ""
+        for player in best_defending:
+            score = stats[defending_team_name]["scores"][player[0]]["score"]
+            shots = stats[defending_team_name]["scores"][player[0]]["shots"]
+            percent = 0
+            if shots:
+                percent = (score / shots) * 100
+            text_defending += f"""
+{player[0]}
+{shots} tiros
+{score} goles
+{percent}%
+                    """
+
         info_local = tk.Label(
+            local_window,
             text=f"""
 Tiros: {stats[local_team_name]["shots"]}
 Goles: {stats[local_team_name]["score"]}
-% de anotación: {(stats[local_team_name]["score"]/stats[local_team_name]["shots"])*100}
+% de anotación: {(stats[local_team_name]["score"] / stats[local_team_name]["shots"]) * 100}
 -----------------
 Mejores jugadores:
 {text_local}
-            """
+            """,
+            fg="#ffffff",
+            bg="#000000",
+            font=("04b", 30)
         )
 
-        title.grid(row=0, column=0, columnspan=1, sticky="nsew", expand=tk.BOTH)
-        local_window.attributes("-fullscreen", True)
+        info_defending = tk.Label(
+            local_window,
+            text=f"""
+        Tiros: {stats[defending_team_name]["shots"]}
+        Goles: {stats[defending_team_name]["score"]}
+        % de anotación: {(stats[defending_team_name]["score"] / stats[defending_team_name]["shots"]) * 100}
+        -----------------
+        Mejores jugadores:
+        {text_defending}
+                    """,
+            fg="#ffffff",
+            bg="#000000",
+            font=("04b", 30)
+        )
         local_window.attributes("-topmost", True)
+        local_window.attributes("-fullscreen", True)
+
+        info_local.grid(row=1, column=0, sticky="nsew")
+        info_defending.grid(row=1, column=1, sticky="nsew")
+        title.grid(row=0, column=0, columnspan=1, sticky="nsew")
 
     def button(self, text, on_activation, master=None):
         button_widget = tk.Button(
@@ -741,12 +781,13 @@ Mejores jugadores:
             anchor="nw",
             font=("04b", 50)
         )
-        change_team = update_data("SIGTEAM")
-        self.defending_team, self.current_team_playing = self.current_team_playing, self.defending_team
+
         if self.defending_team.shot == 5 and self.current_team_playing.shot == 5:
             self.show_stats()
             master.destroy()
         else:
+            change_team = update_data("SIGTEAM")
+            self.defending_team, self.current_team_playing = self.current_team_playing, self.defending_team
             master.destroy()
             self.select_player()
 

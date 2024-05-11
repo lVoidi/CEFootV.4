@@ -1,56 +1,56 @@
 {
-  "Manchester United": {
-    "score": 0,
-    "shots": 0,
-    "scores": {
-      "Cavani": {
+    "Manchester United": {
         "score": 0,
-        "shots": 0
-      },
-      "harry": {
+        "shots": 0,
+        "scores": {
+            "Cavani": {
+                "score": 0,
+                "shots": 0
+            },
+            "harry": {
+                "score": 0,
+                "shots": 0
+            },
+            "RonaldoMU": {
+                "score": 0,
+                "shots": 0
+            }
+        }
+    },
+    "Barcelona": {
         "score": 0,
-        "shots": 0
-      },
-      "RonaldoMU": {
+        "shots": 0,
+        "scores": {
+            "Lewi": {
+                "score": 0,
+                "shots": 0
+            },
+            "Neymar": {
+                "score": 0,
+                "shots": 0
+            },
+            "Pessi": {
+                "score": 0,
+                "shots": 0
+            }
+        }
+    },
+    "Real Madrid": {
         "score": 0,
-        "shots": 0
-      }
+        "shots": 0,
+        "scores": {
+            "Bale": {
+                "score": 0,
+                "shots": 0
+            },
+            "Ronaldo": {
+                "score": 0,
+                "shots": 0
+            },
+            "Vinicius": {
+                "score": 0,
+                "shots": 0
+            }
+        }
     }
-  },
-  "Barcelona": {
-    "score": 0,
-    "shots": 0,
-    "scores": {
-      "Lewi": {
-        "score": 0,
-        "shots": 0
-      },
-      "Neymar": {
-        "score": 0,
-        "shots": 0
-      },
-      "Pessi": {
-        "score": 0,
-        "shots": 0
-      }
-    }
-  },
-  "Real Madrid": {
-    "score": 0,
-    "shots": 0,
-    "scores": {
-      "Bale": {
-        "score": 0,
-        "shots": 0
-      },
-      "Ronaldo": {
-        "score": 0,
-        "shots": 0
-      },
-      "Vinicius": {
-        "score": 0,
-        "shots": 0
-      }
-    }
-  }
 }
