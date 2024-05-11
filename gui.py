@@ -182,17 +182,18 @@ class MainWindow(tk.Tk):
         return image
 
     def show_stats(self):
+        self.withdraw()
         local_window = tk.Toplevel(self)
         local_window.config(
-            bg="#000000",
-            width=1920,
-            height=1080
+            bg="#000000"
         )
         ganador = f"{self.defending_team.name}"
         if self.current_team_playing.score > self.defending_team.score:
             ganador = f"{self.current_team_playing.name}"
         title = tk.Label(
+            local_window,
             text=f"Ganador: {ganador}",
+            justify="center",
             pady=50,
             fg="#ffffff",
             bg="#000000",
@@ -277,31 +278,41 @@ Goles: {stats[local_team_name]["score"]}
 Mejores jugadores:
 {text_local}
             """,
+            justify="center",
             fg="#ffffff",
             bg="#000000",
-            font=("04b", 30)
+            font=("04b", 20)
         )
 
         info_defending = tk.Label(
             local_window,
             text=f"""
-        Tiros: {stats[defending_team_name]["shots"]}
-        Goles: {stats[defending_team_name]["score"]}
-        % de anotación: {(stats[defending_team_name]["score"] / stats[defending_team_name]["shots"]) * 100}
-        -----------------
-        Mejores jugadores:
+Tiros: {stats[defending_team_name]["shots"]}
+Goles: {stats[defending_team_name]["score"]}
+% de anotación: {(stats[defending_team_name]["score"] / stats[defending_team_name]["shots"]) * 100}
+-----------------
+Mejores jugadores:
         {text_defending}
                     """,
+            justify="center",
             fg="#ffffff",
             bg="#000000",
-            font=("04b", 30)
+            font=("04b", 20)
         )
+        reset_button = self.button("Resetear stats", self.reset_stats, master=local_window)
+        exit_button = self.button("Salir", self.destroy, master=local_window)
         local_window.attributes("-topmost", True)
         local_window.attributes("-fullscreen", True)
 
         info_local.grid(row=1, column=0, sticky="nsew")
         info_defending.grid(row=1, column=1, sticky="nsew")
-        title.grid(row=0, column=0, columnspan=1, sticky="nsew")
+        reset_button.grid(row=2, column=0, columnspan=2, sticky="nsew")
+        exit_button.grid(row=3, column=0, columnspan=2, sticky="nsew")
+        title.grid(row=0, column=0, columnspan=2, sticky="nsew")
+
+    def reset_stats(self):
+        with open("stats.json", "w") as file:
+            file.write(json.dumps(DEFAULT))
 
     def button(self, text, on_activation, master=None):
         button_widget = tk.Button(
@@ -474,7 +485,6 @@ Mejores jugadores:
         title.pack()
         coin.place(x=1800 // 2, y=600)
         coin_window.attributes("-topmost", True)
-        coin_window.attributes("-fullscreen", True)
         coin_animation = threading.Thread(target=self.animate_coin, args=(frames, coin, coin_window,))
         coin_animation.start()
 
@@ -729,7 +739,7 @@ Mejores jugadores:
         else:
             text = "ES UN \nP*JA\n DE PORTERO!!!"
             if final_time - initial_time > 5:
-                text = "Tiro perdido\n POR TIEMPO"
+                text = "TIRO PERDIDO\n POR TIEMPO"
             self.ON_FAIL.play()
             title = self.game_canvas.create_text(
                 0, 1080 // 2,
