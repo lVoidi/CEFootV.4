@@ -58,13 +58,19 @@ def listen_to_goal(goalkeeper_indices, cl, addr):
 
     is_goal = True
     pressed = False
+    
     for index, value in enumerate(values):
         if value:
             pressed_button_index = index
             pressed = True
         if value and index in goalkeeper_indices:
             is_goal = False
-            break
+    goal = ""
+    for i in range(6):
+        if i in goalkeeper_indices:
+            goal += "1"
+        else:
+            goal += "0"
 
     prefix = ""
     if pressed and is_goal:
@@ -72,7 +78,7 @@ def listen_to_goal(goalkeeper_indices, cl, addr):
     elif pressed and not is_goal:
         prefix = "0"
 
-    code = prefix
+    code = f"{prefix}:{pressed_button_index}:{goal}"
     if pressed:
         goal_leds[pressed_button_index].value(1)
         send_code(code, cl)

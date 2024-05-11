@@ -31,16 +31,29 @@ class Team:
     def __init__(self, name: str):
         self.name = name
         self.score = 0
+        self.shot = 0
+        self.player: Player = None
+        self.goalie: Goalie = None
+        self.shot_record = ["empty" for _ in range(5)]
         self.path = Path(f"assets/{name}/")
-        self.logo = self.path.joinpath("logo.png")
+        self.logo = self.path.joinpath("logo.jpg")
+        self.logo_png = self.path.joinpath("logo.png")
         self.goalies_path = self.path.joinpath("goalie")
         self.players_path = self.path.joinpath("player")
         self.goalies = []
         self.players = []
         for name in os.listdir(self.goalies_path):
-            self.goalies.append(Goalie(name.replace(".jpg", ""), self.goalies_path))
+            self.goalies.append(Goalie(name.replace(".jpg", "").replace(".png",
+                                                                        "").replace("jpeg", ""),
+                                       self.goalies_path.joinpath(name)))
         for name in os.listdir(self.players_path):
-            self.players.append(Player(name.replace(".jpg", ""), self.players_path))
+            self.players.append(Player(name.replace(".jpg", "").replace(".png",
+                                                                        "").replace("jpeg", ""),
+                                       self.players_path.joinpath(name)))
+
+
+def movement_ratio(x):
+    return -x * (x - 1.5)
 
 
 class MainWindow(tk.Tk):
@@ -49,7 +62,9 @@ class MainWindow(tk.Tk):
         pygame.mixer.init()
         pygame.mixer.music.load("assets/bgmusic.mp3")
         pygame.mixer.music.play(loops=-1)
+        pygame.mixer.music.set_volume(0.5)
         # Constantes
+        self.wm_attributes('-alpha', 0.5)
         self.ON_FAIL = pygame.mixer.Sound("assets/abucheo.mp3")
         self.ON_GOAL = pygame.mixer.Sound("assets/gol.mp3")
         self.ON_START = pygame.mixer.Sound("assets/pito.mp3")
@@ -57,7 +72,10 @@ class MainWindow(tk.Tk):
         self.image_counter = 0
         # Configuración inicial
         self.config(
-            bg="#000000"
+            bg="#000000",
+            width=1920,
+            height=1080,
+
         )
         self.attributes("-fullscreen", True)
         self.attributes("-topmost", True)
@@ -77,16 +95,21 @@ class MainWindow(tk.Tk):
         background_widget.place(x=0, y=0)
         start_button.place(x=360, y=840)
         about_button.place(x=1150, y=840)
-
+        self.divisions = []
+        self.game_canvas: tk.Canvas = None
         self.red_team: Team = None
         self.blue_team: Team = None
         self.defending_team: Team = None
+        self.is_team_selected = False
         self.current_team_playing: Team = None
-        self.is_red_selected = False
-        self.is_blue_selected = False
         self.blue_team_widget = None
         self.red_team_widget = None
         self.team_selecting_title = None
+        self.player_widget = None
+        self.goalie_widget = None
+        self.is_player_selected = False
+        self.player_title = None
+
         self.teams_pool = [Team("Barcelona"), Team("Manchester United"), Team("Real Madrid")]
         self.bind("<Key>", lambda e: self.close(e))
 
@@ -119,7 +142,9 @@ class MainWindow(tk.Tk):
     def show_about_page(self):
         local_window = tk.Toplevel(self)
         local_window.config(
-            bg="#000000"
+            bg="#000000",
+            width=1920,
+            height=1080
         )
 
         back_arrow = self.image("assets/arrow.png", (128, 128))
@@ -148,7 +173,9 @@ class MainWindow(tk.Tk):
     def select_team_screen(self):
         local_window = tk.Toplevel(self)
         local_window.config(
-            bg="#000000"
+            bg="#000000",
+            width=1920,
+            height=1080
         )
 
         back_arrow = self.image("assets/arrow.png", (128, 128))
@@ -187,13 +214,11 @@ class MainWindow(tk.Tk):
             font=("04b", 40)
         )
 
-        select_blue = self.button("Seleccionar azul", self.set_blue_team, master=local_window)
-        select_red = self.button("Seleccionar rojo", self.set_red_team, master=local_window)
+        select_button = self.button("Seleccionar", self.set_team, master=local_window)
 
         self.blue_team_widget.place(x=256, y=256)
         self.red_team_widget.place(x=1152, y=256)
-        select_blue.place(x=160, y=800)
-        select_red.place(x=1050, y=800)
+        select_button.place(x=700, y=800)
         self.team_selecting_title.pack()
         local_window.attributes("-fullscreen", True)
         local_window.attributes("-topmost", True)
@@ -201,45 +226,49 @@ class MainWindow(tk.Tk):
         selecting_team_thread.start()
 
     def selecting_team(self, master):
-        while not self.is_blue_selected:
+        while not self.is_team_selected:
             pot_value = int(update_data("SIGPOT"))
             self.blue_team = self.teams_pool[pot_value]
             blue_team_image = self.image(self.blue_team.logo, (512, 512))
             self.blue_team_widget["image"] = blue_team_image
             time.sleep(0.2)
 
+        self.is_team_selected = False
         self.team_selecting_title["text"] = "Seleccionando: Rojo"
 
-        while not self.is_red_selected:
+        while not self.is_team_selected:
             pot_value = int(update_data("SIGPOT"))
             self.red_team = self.teams_pool[pot_value]
             red_team_image = self.image(self.red_team.logo, (512, 512))
             self.red_team_widget["image"] = red_team_image
             time.sleep(0.2)
-
+        self.is_team_selected = False
         master.destroy()
+        time.sleep(1)
         self.open_coin_window()
 
-    def set_blue_team(self):
+    def set_team(self):
         if self.blue_team != self.red_team:
-            self.is_blue_selected = True
+            self.is_team_selected = True
 
-    def set_red_team(self):
-        if self.blue_team != self.red_team:
-            self.is_red_selected = True
+    def set_player(self):
+        self.is_player_selected = True
 
     def open_coin_window(self):
         coin_window = tk.Toplevel(self)
         coin_window.config(
-            bg="#000000"
+            bg="#000000",
+            width=1920,
+            height=1080
         )
 
         if not self.current_team_playing:
             self.current_team_playing = random.choice((self.blue_team, self.red_team))
-        self.defending_team = self.blue_team if self.current_team_playing != self.blue_team_widget else self.red_team
+        self.defending_team = self.blue_team if self.current_team_playing != self.blue_team else self.red_team
         title = tk.Label(
             coin_window,
             text=f"{self.current_team_playing.name} Inicia",
+            pady=500,
             fg="#ffffff",
             bg="#000000",
             font=("04b", 40)
@@ -254,7 +283,7 @@ class MainWindow(tk.Tk):
             image=frames[0]
         )
         title.pack()
-        coin.pack()
+        coin.place(x=1800 // 2, y=600)
         coin_window.attributes("-topmost", True)
         coin_window.attributes("-fullscreen", True)
         coin_animation = threading.Thread(target=self.animate_coin, args=(frames, coin, coin_window,))
@@ -267,38 +296,274 @@ class MainWindow(tk.Tk):
                 coin["image"] = frame
                 time.sleep(0.05)
         master.destroy()
+        self.select_player()
 
     def select_player(self):
-        local_window = tk.Toplevel(self)
-        local_window.config(
-            bg="#000000"
+        player_window = tk.Toplevel(self)
+        player_window.config(
+            bg="#000000",
+            width=1920,
+            height=1080
         )
 
         player_image = self.image(self.current_team_playing.players[0].path, (512, 512))
         goalie_image = self.image(self.defending_team.goalies[0].path, (512, 512))
 
+        self.player_widget = tk.Label(
+            player_window,
+            bd=0,
+            relief="flat",
+            image=player_image
+        )
 
-        local_window.attributes("-fullscreen", True)
-        local_window.attributes("-topmost", True)
-        selecting_player_thread = threading.Thread(target=self.selecting_player, args=(local_window,))
+        self.goalie_widget = tk.Label(
+            player_window,
+            bd=0,
+            relief="flat",
+            image=goalie_image
+        )
+
+        self.player_title = tk.Label(
+            player_window,
+            text=f"{self.current_team_playing.name}: {self.current_team_playing.players[0].name}",
+            pady=100,
+            fg="#ffffff",
+            bg="#000000",
+            font=("04b", 40)
+        )
+
+        player_button = self.button("Seleccionar", self.set_player, master=player_window)
+
+        self.player_widget.place(x=256, y=256)
+        self.goalie_widget.place(x=1152, y=256)
+        player_button.place(x=700, y=800)
+        self.player_title.pack()
+        player_window.attributes("-topmost", True)
+        player_window.attributes("-fullscreen", True)
+
+        selecting_player_thread = threading.Thread(target=self.selecting_player, args=(player_window,))
         selecting_player_thread.start()
 
     def selecting_player(self, master):
-        while not self.is_blue_selected:
+        while not self.is_player_selected:
             pot_value = int(update_data("SIGPOT"))
-            self.blue_team = self.teams_pool[pot_value]
-            blue_team_image = self.image(self.blue_team.logo, (512, 512))
-            self.blue_team_widget["image"] = blue_team_image
+            player = self.current_team_playing.players[pot_value]
+            self.current_team_playing.player = player
+            player_image = self.image(player.path, (512, 512))
+            self.player_widget["image"] = player_image
+            self.player_title["text"] = f"{self.current_team_playing.name}: {player.name}"
             time.sleep(0.2)
-
-        self.team_selecting_title["text"] = "Seleccionando: Rojo"
-
-        while not self.is_red_selected:
+        self.is_player_selected = False
+        while not self.is_player_selected:
             pot_value = int(update_data("SIGPOT"))
-            self.red_team = self.teams_pool[pot_value]
-            red_team_image = self.image(self.red_team.logo, (512, 512))
-            self.red_team_widget["image"] = red_team_image
+            goalie = self.defending_team.goalies[pot_value]
+            self.defending_team.goalie = goalie
+            goalie_image = self.image(goalie.path, (512, 512))
+            self.goalie_widget["image"] = goalie_image
+            self.player_title["text"] = f"{self.defending_team.name}: {goalie.name}"
             time.sleep(0.2)
+        self.is_player_selected = False
+        master.destroy()
+        self.start_playing()
+
+    def start_playing(self):
+        game = tk.Toplevel(self)
+        game.config(
+            bg="#000000",
+            width=1920,
+            height=1080
+        )
+        game.attributes("-topmost", True)
+        game.attributes("-fullscreen", True)
+        pygame.mixer.music.stop()
+        pygame.mixer.music.load("assets/crowd.mp3")
+        pygame.mixer.music.play(loops=-1)
+
+        game_canvas = tk.Canvas(
+            game,
+            width=1920,
+            height=1080,
+            bg=f"#cafbfb"
+        )
+        self.game_canvas = game_canvas
+        background = self.image("assets/back.png", (1920, 1080))
+        background_image = game_canvas.create_image(
+            0, 0,
+            image=background,
+            anchor="nw"
+        )
+
+        ball = self.image("assets/ball.png", (128, 128))
+        ball_image = game_canvas.create_image(
+            960, 975,
+            image=ball,
+            anchor="center"
+        )
+
+        goal_coordinates = 472, 199, 1450, 669
+        goal_division = []
+        goal_width = goal_coordinates[2] - goal_coordinates[0]
+        goal_anchor = goal_width // 6
+        initial, final = goal_coordinates[0], goal_coordinates[2]
+        for i in range(6):
+            x0, y0, x1, y1 = goal_coordinates
+            goal_division.append(
+                [initial, y0, initial + goal_anchor, y1]
+            )
+            initial += goal_anchor
+
+        penalties_blue, penalties_red = [], []
+        for i in range(5):
+            bias = i * 20 + 20
+            if self.blue_team.shot_record[i] == "empty":
+                oval_blue = game_canvas.create_oval(
+                    bias + i * 100, 20, bias + 100 + i * 100, 120,
+                    width=10
+                )
+                penalties_blue.append(oval_blue)
+            elif self.blue_team.shot_record[i] == "goal":
+                oval_blue = game_canvas.create_oval(
+                    bias + i * 100, 20, bias + 100 + i * 100, 120,
+                    fill="#aaffaa",
+                    width=10
+                )
+                penalties_blue.append(oval_blue)
+            elif self.blue_team.shot_record[i] == "failed":
+                oval_blue = game_canvas.create_oval(
+                    bias + i * 100, 20, bias + 100 + i * 100, 120,
+                    fill="#ffaaaa",
+                    width=10
+                )
+                penalties_blue.append(oval_blue)
+            if self.red_team.shot_record[i] == "empty":
+                oval_red = game_canvas.create_oval(
+                    1920 - i * 100 - bias, 20, 1920 - (i * 100 + 100) - bias, 120,
+                    width=10
+                )
+                penalties_red.append(oval_red)
+            elif self.red_team.shot_record[i] == "goal":
+                oval_red = game_canvas.create_oval(
+                    1920 - i * 100 - bias, 20, 1920 - (i * 100 + 100) - bias, 120,
+                    width=10,
+                    fill="#aaffaa"
+                )
+                penalties_red.append(oval_red)
+            elif self.red_team.shot_record[i] == "failed":
+                oval_red = game_canvas.create_oval(
+                    1920 - i * 100 - bias, 20, 1920 - (i * 100 + 100) - bias, 120,
+                    width=10,
+                    fill="#ffaaaa"
+                )
+                penalties_red.append(oval_red)
+
+        self.divisions = []
+
+        for division in goal_division:
+            div = game_canvas.create_rectangle(
+                *division
+            )
+            self.divisions.append(div)
+
+        blue_team = self.image(self.blue_team.logo_png, (256, 256))
+        red_team = self.image(self.red_team.logo_png, (256, 256))
+        game_canvas.create_image(
+            250, 350,
+            image=blue_team
+        )
+        game_canvas.create_image(
+            1920 - 250, 350,
+            image=red_team
+        )
+
+        game_canvas.pack()
+        check_goal = threading.Thread(target=self.wait_for_shot, args=(game,))
+        check_goal.start()
+
+    def wait_for_shot(self, master):
+        time.sleep(2)
+        self.ON_START.play()
+        initial_time = time.time()
+        listener = update_data("SIGGOAL")
+        is_goal, index, goalie = listener.split(":")
+        for index, division in enumerate(self.divisions):
+            if goalie[index] == "1":
+                self.game_canvas.itemconfig(division, fill="#aaaaaa")
+        time.sleep(1.5)
+
+        if is_goal == "1" and time.time() - initial_time <= 5:
+            self.ON_GOAL.play()
+            title = self.game_canvas.create_text(
+                0, 1080 // 2,
+                text="GOLAZO!!!",
+                fill="#000000",
+                anchor="center",
+                font=("Platinum Sign", 60)
+            )
+            title_2 = self.game_canvas.create_text(
+                5, 5 + 1080 // 2,
+                text="GOLAZO!!!",
+                fill="#ffffff",
+                anchor="center",
+                font=("Platinum Sign", 60)
+            )
+            for i in range(40):
+                self.game_canvas.move(title, 40 - i, 0)
+                self.game_canvas.move(title_2, 40 - i, 0)
+                time.sleep(0.025)
+            for i in range(20):
+                self.game_canvas.move(title, 1, 0)
+                self.game_canvas.move(title_2, 1, 0)
+                time.sleep(0.05)
+            for i in range(1000):
+                self.game_canvas.move(title, i, 0)
+                self.game_canvas.move(title_2, i, 0)
+                time.sleep(0.005)
+
+            self.current_team_playing.shot_record[self.current_team_playing.shot] = "goal"
+            self.current_team_playing.player.shots += 1
+            self.current_team_playing.player.score += 1
+            self.current_team_playing.score += 1
+
+
+
+        else:
+            self.ON_FAIL.play()
+            title = self.game_canvas.create_text(
+                0, 1080 // 2,
+                text="ES UN \nP*JA\n DE PORTERO!!!",
+                fill="#000000",
+                justify="center",
+                anchor="center",
+                font=("Platinum Sign", 60)
+            )
+            title_2 = self.game_canvas.create_text(
+                5, 5 + 1080 // 2,
+                text="ES UN \nP*JA\n DE PORTERO!!!",
+                justify="center",
+                fill="#ffffff",
+                anchor="center",
+                font=("Platinum Sign", 60)
+            )
+            for i in range(40):
+                self.game_canvas.move(title, 40 - i, 0)
+                self.game_canvas.move(title_2, 40 - i, 0)
+                time.sleep(0.025)
+            for i in range(20):
+                self.game_canvas.move(title, 1, 0)
+                self.game_canvas.move(title_2, 1, 0)
+                time.sleep(0.05)
+            for i in range(1000):
+                self.game_canvas.move(title, i, 0)
+                self.game_canvas.move(title_2, i, 0)
+                time.sleep(0.005)
+            self.current_team_playing.shot_record[self.current_team_playing.shot] = "failed"
+            self.current_team_playing.player.shots += 1
+            self.defending_team.goalie.saved += 1
+        self.current_team_playing.shot += 1
+        time.sleep(3)
+        self.defending_team, self.current_team_playing = self.current_team_playing, self.defending_team
+        master.destroy()
+        self.select_player()
 
 
 root = MainWindow()
