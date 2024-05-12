@@ -11,6 +11,8 @@ import time
 import pygame
 import os
 
+__version__ = "V2 12.5.2024"
+
 DEFAULT = {
     "Manchester United": {
         "score": 0,
@@ -121,8 +123,7 @@ class MainWindow(tk.Tk):
         pygame.mixer.music.load("assets/bgmusic.mp3")
         pygame.mixer.music.play(loops=-1)
         pygame.mixer.music.set_volume(1.0)
-        # Constantes
-        self.wm_attributes('-alpha', 0.5)
+     
         self.ON_FAIL = pygame.mixer.Sound("assets/abucheo.mp3")
         self.ON_GOAL = pygame.mixer.Sound("assets/gol.mp3")
         self.ON_SHOT = pygame.mixer.Sound("assets/shot.mp3")
@@ -190,6 +191,8 @@ class MainWindow(tk.Tk):
         ganador = f"{self.defending_team.name}"
         if self.current_team_playing.score > self.defending_team.score:
             ganador = f"{self.current_team_playing.name}"
+        elif self.current_team_playing.score == self.defending_team.score:
+            ganador = "Empate"
         title = tk.Label(
             local_window,
             text=f"Ganador: {ganador}",
@@ -301,8 +304,6 @@ Mejores jugadores:
         )
         reset_button = self.button("Resetear stats", self.reset_stats, master=local_window)
         exit_button = self.button("Salir", self.destroy, master=local_window)
-        local_window.attributes("-topmost", True)
-        local_window.attributes("-fullscreen", True)
 
         info_local.grid(row=1, column=0, sticky="nsew")
         info_defending.grid(row=1, column=1, sticky="nsew")
@@ -411,12 +412,12 @@ Mejores jugadores:
 
         select_button = self.button("Seleccionar", self.set_team, master=local_window)
 
+        local_window.attributes("-topmost", True)
+        local_window.attributes("-fullscreen", True)
         self.blue_team_widget.place(x=256, y=256)
         self.red_team_widget.place(x=1152, y=256)
         select_button.place(x=700, y=800)
         self.team_selecting_title.pack()
-        local_window.attributes("-fullscreen", True)
-        local_window.attributes("-topmost", True)
         selecting_team_thread = threading.Thread(target=self.selecting_team, args=(local_window,))
         selecting_team_thread.start()
 
@@ -485,6 +486,7 @@ Mejores jugadores:
         title.pack()
         coin.place(x=1800 // 2, y=600)
         coin_window.attributes("-topmost", True)
+        coin_window.attributes("-fullscreen", True)
         coin_animation = threading.Thread(target=self.animate_coin, args=(frames, coin, coin_window,))
         coin_animation.start()
 
