@@ -82,7 +82,7 @@ def listen_to_goal(goalkeeper_indices, cl, addr):
     if pressed:
         goal_leds[pressed_button_index].value(1)
         send_code(code, cl)
-        time.sleep(1.5)
+        time.sleep(2.5)
         goal_leds[pressed_button_index].value(0)
 
     if not is_goal:
