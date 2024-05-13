@@ -107,7 +107,6 @@ def listen_to_goal(goalkeeper_indices, cl, addr):
 def main():
     global blue_team, code, red_team, current_team_playing
     current_team_playing = "blue"
-    # Leds de cada paleta
     addr = socket.getaddrinfo('0.0.0.0', 8080)[0][-1]
 
     s = socket.socket()
@@ -124,7 +123,7 @@ def main():
             if not line or line == b'\r\n':
                 break
         print(f"[DEBUG] Cliente conectado desde: {addr} ")
-        request = cl.recv(1024).decode().upper()
+        request = cl.recv(1024).decode()
         signal = request.upper()
         
         print(signal)
@@ -186,7 +185,7 @@ def do_connect():
     if not sta_if.isconnected():
         print('connecting to network...')
         sta_if.active(True)
-        sta_if.connect("Senora de lo Angeles", "44556677")
+        sta_if.connect("gary", "Brinco2020")
         while not sta_if.isconnected():
             pass
     debug_pin.value(1)
