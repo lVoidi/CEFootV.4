@@ -35,7 +35,7 @@
 -----
 
 <div align="center" id="cefoot">
-     <h3> ¿que es cefootv.4?</h3>  
+     <h3> ¿Qué es CEFootV.4?</h3>  
      <p align="justify">
           cefootv.4 es una maqueta de un estadio, la cual se comunica con una computadora mediante wi-fi.
           esta conexión pc-maqueta se da por medio de una raspberry pi pico w. la idea del juego es simular
