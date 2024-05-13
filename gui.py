@@ -1,5 +1,14 @@
 # noinspection SpellCheckingInspection
 # Arrow icon: https://www.flaticon.com/free-icon/next_2885955?term=pixel+arrow&page=1&position=1&origin=search&related_id=2885955
+
+# Código que se comunica con la raspberry pi
+# SIGGOAL: La raspberry se queda esperando a que se presione un botón
+# de la portería. Si es gol, prende los leds con un efecto de ola; Si no,
+# prende los leds de manera paralela
+# SIGTEAM: La raspberry espera a que se presione el boton que cambia el color del
+# led del equipo
+# SIGPOT: La raspberry devuelve el valor actual del potenciómetro. El valor
+# del potenciómetro es un numero entre 0 y 2, incluyéndolos.
 from comunicate import update_data
 from PIL import Image, ImageTk
 from pathlib import Path
@@ -13,6 +22,8 @@ import os
 
 __version__ = "V2 12.5.2024"
 
+# Valores por defecto de la configuración. Al darle al boton de reset,
+# estos datos se suben al archivo de stats.json
 DEFAULT = {
     "Manchester United": {
         "score": 0,
@@ -73,6 +84,13 @@ DEFAULT = {
 
 class Player:
     def __init__(self, name, path):
+        """
+        Método constructor del jugador. Los valores
+        de cada parámetro significan lo mismo tanto
+        para el jugador como para el portero
+        :param name: Nombre del jugador (Igual que en los archivos, exceptuando extensiones)
+        :param path: Path del jugador
+        """
         self.name = name
         self.path = path
         self.score = 0
@@ -81,6 +99,13 @@ class Player:
 
 class Goalie:
     def __init__(self, name, path):
+        """
+        Método constructor del portero. Los valores
+        de cada parámetro significan lo mismo tanto
+        para el jugador como para el portero
+        :param name: Nombre del portero (Igual que en los archivos, exceptuando extensiones)
+        :param path: Path del portero
+        """
         self.name = name
         self.path = path
         self.saved = 0
@@ -88,20 +113,47 @@ class Goalie:
 
 class Team:
     def __init__(self, name: str):
+        """
+        Inicializa la clase de un equipo «name».
+        :param name: Nombre del equipo, igual que en los archivos
+        """
         self.name = name
         self.score = 0
         self.shot = 0
+
+        # Estos valores van a ser alterados conforme a los turnos.
+        # Player es el jugador que está tirando actualmente
+        # Goalie es el portero que está atajando actualmente
+        # Inicialmente equivalen a None, después se les pone un valor
         self.player: Player = None
         self.goalie: Goalie = None
+
+        # Mantiene la historia de los tiros para cada equipo.
+        # Son los círculos que marcan el penal actual en la
+        # parte superior de la pantalla. Que esté vacío el círculo
+        # significa que aún no se ha tirado, que esté verde significa
+        # que ese turno específico fue gol y que esté rojo significa
+        # que se falló ese tiro, tanto por tiempo como por atajada
+        # Esta lista toma valores «empty», «goal» y «failed»
         self.shot_record = ["empty" for _ in range(5)]
         self.path = Path(f"assets/{name}/")
+
+        # Guarda el path del escudo del equipo, tanto su versión jpg como su
+        # versión png. La versión jpg se necesita en la primera pantalla de
+        # selección de equipo, y la versión png se ocupa para la pantalla de tiros
         self.logo = self.path.joinpath("logo.jpg")
         self.logo_png = self.path.joinpath("logo.png")
+
+        # Guarda los paths tanto de los jugadores como de los porteros
         self.goalies_path = self.path.joinpath("goalie")
         self.players_path = self.path.joinpath("player")
+
+        # Esta parte del código guarda una pool con todos los jugadores y
+        # porteros disponibles para el equipo «name».
         self.goalies = []
         self.players = []
         for name in os.listdir(self.goalies_path):
+            # Los replace se aseguran de quitar cualquier extensión de archivo innecesaria
             self.goalies.append(Goalie(name.replace(".jpg", "").replace(".png",
                                                                         "").replace("jpeg", ""),
                                        self.goalies_path.joinpath(name)))
@@ -111,28 +163,98 @@ class Team:
                                        self.players_path.joinpath(name)))
 
 
-def movement_ratio(x):
-    return -1.778 * x * (x - 1.5)
+def movement_ratio(t):
+    """
+    Posición relativa de la bola en función del tiempo. La idea
+    de esta función es emular un movimiento 3d de la bola en
+    función del tiempo, para un plano 2d, como lo es un canvas
+    :param t: Tiempo actual. En realidad, sería correcto denotarlo Δt pues
+              este valor del tiempo en realidad es (time.time() - initial_time)
+    :return: f(t) Número entre 0 y 1. Intersecciones de la gráfica en t=0 y t=1.5
+    """
+    return -1.778 * t * (t - 1.5)
+
+
+def reset_stats():
+    with open("stats.json", "w") as file:
+        file.write(json.dumps(DEFAULT))
 
 
 class MainWindow(tk.Tk):
     def __init__(self):
+        """
+        Esta clase hereda la clase tk.Tk de tkinter, para uso más
+        sencillo del mismo root.
+        """
         super().__init__()
+
+        # Guarda la imagen de la bola. No confundir por
+        # la id de la bola generada al crear la imagen en el canvas
         self.ball_image_id = None
+
+        # Carga todos los sonidos y música default
         pygame.mixer.init()
         pygame.mixer.music.load("assets/bgmusic.mp3")
         pygame.mixer.music.play(loops=-1)
         pygame.mixer.music.set_volume(1.0)
-     
+
         self.ON_FAIL = pygame.mixer.Sound("assets/abucheo.mp3")
         self.ON_GOAL = pygame.mixer.Sound("assets/gol.mp3")
         self.ON_SHOT = pygame.mixer.Sound("assets/shot.mp3")
         self.ON_EXPLOSION = pygame.mixer.Sound("assets/explosion.mp3")
         self.ON_START = pygame.mixer.Sound("assets/pito.mp3")
         self.ON_SELECT = pygame.mixer.Sound("assets/select.mp3")
+
+        # Este contador de imágenes funciona para
+        # evitar problemas con el garbage collector.
         self.image_counter = 0
+
+        # ID de la bola en el self.game_canvas
         self.ball = 0
+
+        # Matriz 6*2 que guarda el punto medio de cada
+        # paleta. A estos puntos, es que se dirige la bola al
+        # ser tirada
         self.shooting_points = []
+
+        # Matriz 6*4 que guarda todas las paletas. Tanto posiciones iniciales
+        # como posiciones finales de la paleta: (xi, yi, xf, yf)
+        self.divisions = []
+
+        # Canvas del juego principal
+        self.game_canvas: tk.Canvas = None
+
+        # Clases para cada equipo. Cabe destacar que
+        # blue team y red team son una manera de diferenciar los
+        # equipos. Esto no indica el jugador inicial en sí
+        self.red_team: Team = None
+        self.blue_team: Team = None
+
+        # Esto indica el equipo defendiendo y el equipo tirando
+        # en el turno actual
+        self.defending_team: Team = None
+        self.current_team_playing: Team = None
+
+        # Estas variables se vuelven True cuando se selecciona el equipo o
+        # los jugadores, para el caso de is_player_selected.
+        self.is_team_selected = False
+        self.is_player_selected = False
+
+        # Guarda el widget de cada equipo
+        self.blue_team_widget = None
+        self.red_team_widget = None
+
+        # Este titulo se actualiza cuando se selecciona el equipo.
+        self.team_selecting_title = None
+
+        self.player_widget = None
+        self.goalie_widget = None
+
+        self.player_title = None
+
+        # Guarda en una pool todos los equipos posibles
+        self.teams_pool = [Team("Barcelona"), Team("Manchester United"), Team("Real Madrid")]
+
         # Configuración inicial
         self.config(
             bg="#000000",
@@ -140,8 +262,8 @@ class MainWindow(tk.Tk):
             height=1080,
 
         )
-        self.attributes("-fullscreen", True)
         self.attributes("-topmost", True)
+        self.attributes("-fullscreen", True)
 
         # Pantalla principal
         background = self.image("assets/main_win_background.png", (1920, 1080))
@@ -158,164 +280,41 @@ class MainWindow(tk.Tk):
         background_widget.place(x=0, y=0)
         start_button.place(x=360, y=840)
         about_button.place(x=1150, y=840)
-        self.divisions = []
-        self.game_canvas: tk.Canvas = None
-        self.red_team: Team = None
-        self.blue_team: Team = None
-        self.defending_team: Team = None
-        self.is_team_selected = False
-        self.current_team_playing: Team = None
-        self.blue_team_widget = None
-        self.red_team_widget = None
-        self.team_selecting_title = None
-        self.player_widget = None
-        self.goalie_widget = None
-        self.is_player_selected = False
-        self.player_title = None
 
-        self.teams_pool = [Team("Barcelona"), Team("Manchester United"), Team("Real Madrid")]
+        # Hace que el programa se pueda cerrar presionando la q
         self.bind("<Key>", lambda e: self.close(e))
 
+    def close(self, event):
+        if event.keysym == 'q' or event.keysym == 'Q':
+            pygame.mixer.music.stop()
+            self.destroy()
+
     def image(self, name, resolution):
+        """
+        Este código devuelve una instancia de PhotoImage para facilitar
+        el posicionamiento de imágenes en el código.
+        :param name: Path de la imagen (str | Path)
+        :param resolution: Tupla del tamaño de la imagen
+        :return: Instancia de PhotoImage
+        """
         image = ImageTk.PhotoImage(Image.open(name).resize(resolution))
+
+        # Esta parte es necesaria para esquivar el garbage collector. Lo
+        # que hace es asignarle a la clase de MainWindow un atributo especial,
+        # que será "img«n»", donde n es el contador de imágenes. Esto evita que
+        # la imagen sea borrada por el garbage collector
         setattr(self, f"img{self.image_counter}", image)
         self.image_counter += 1
         return image
 
-    def show_stats(self):
-        self.withdraw()
-        local_window = tk.Toplevel(self)
-        local_window.config(
-            bg="#000000"
-        )
-        ganador = f"{self.defending_team.name}"
-        if self.current_team_playing.score > self.defending_team.score:
-            ganador = f"{self.current_team_playing.name}"
-        elif self.current_team_playing.score == self.defending_team.score:
-            ganador = "Empate"
-        title = tk.Label(
-            local_window,
-            text=f"Ganador: {ganador}",
-            justify="center",
-            pady=50,
-            fg="#ffffff",
-            bg="#000000",
-            font=("04b", 50)
-        )
-        stats = {}
-        with open("stats.json") as file:
-            stats_file = file.read()
-            stats = json.loads(stats_file)
-
-        local_team_name = self.current_team_playing.name
-        defending_team_name = self.defending_team.name
-
-        old_stats = stats
-
-        for player in self.current_team_playing.players:
-            stats[local_team_name]["scores"][player.name] = {
-                "score": player.score + old_stats[local_team_name]["scores"][player.name]["score"],
-                "shots": player.shots + old_stats[local_team_name]["scores"][player.name]["shots"],
-            }
-
-        stats[local_team_name]["score"] = old_stats[local_team_name]["score"] + self.current_team_playing.score
-        stats[local_team_name]["shots"] = old_stats[local_team_name]["shots"] + self.current_team_playing.shot
-
-        for player in self.defending_team.players:
-            stats[defending_team_name]["scores"][player.name] = {
-                "score": player.score + old_stats[defending_team_name]["scores"][player.name]["score"],
-                "shots": player.shots + old_stats[defending_team_name]["scores"][player.name]["shots"],
-            }
-
-        stats[defending_team_name]["score"] = old_stats[defending_team_name]["score"] + self.defending_team.score
-        stats[defending_team_name]["shots"] = old_stats[defending_team_name]["shots"] + self.defending_team.shot
-
-        new_stats = json.dumps(stats)
-        with open("stats.json", "w") as file:
-            file.write(new_stats)
-
-        best_local = sorted(stats[local_team_name]["scores"].items(),
-                            key=lambda x: x[1]['score'], reverse=True)
-
-        best_defending = sorted(stats[defending_team_name]["scores"].items(),
-                                key=lambda x: x[1]['score'], reverse=True)
-
-        local_team_best = best_local[:3]
-        defending_best = best_defending[:3]
-
-        text_local = ""
-        for player in best_local:
-            score = stats[local_team_name]["scores"][player[0]]["score"]
-            shots = stats[local_team_name]["scores"][player[0]]["shots"]
-            percent = 0
-            if shots:
-                percent = (score / shots) * 100
-            text_local += f"""
-{player[0]}
-{shots} tiros
-{score} goles
-{percent}%
-            """
-
-        text_defending = ""
-        for player in best_defending:
-            score = stats[defending_team_name]["scores"][player[0]]["score"]
-            shots = stats[defending_team_name]["scores"][player[0]]["shots"]
-            percent = 0
-            if shots:
-                percent = (score / shots) * 100
-            text_defending += f"""
-{player[0]}
-{shots} tiros
-{score} goles
-{percent}%
-                    """
-
-        info_local = tk.Label(
-            local_window,
-            text=f"""
-Tiros: {stats[local_team_name]["shots"]}
-Goles: {stats[local_team_name]["score"]}
-% de anotación: {(stats[local_team_name]["score"] / stats[local_team_name]["shots"]) * 100}
------------------
-Mejores jugadores:
-{text_local}
-            """,
-            justify="center",
-            fg="#ffffff",
-            bg="#000000",
-            font=("04b", 20)
-        )
-
-        info_defending = tk.Label(
-            local_window,
-            text=f"""
-Tiros: {stats[defending_team_name]["shots"]}
-Goles: {stats[defending_team_name]["score"]}
-% de anotación: {(stats[defending_team_name]["score"] / stats[defending_team_name]["shots"]) * 100}
------------------
-Mejores jugadores:
-        {text_defending}
-                    """,
-            justify="center",
-            fg="#ffffff",
-            bg="#000000",
-            font=("04b", 20)
-        )
-        reset_button = self.button("Resetear stats", self.reset_stats, master=local_window)
-        exit_button = self.button("Salir", self.destroy, master=local_window)
-
-        info_local.grid(row=1, column=0, sticky="nsew")
-        info_defending.grid(row=1, column=1, sticky="nsew")
-        reset_button.grid(row=2, column=0, columnspan=2, sticky="nsew")
-        exit_button.grid(row=3, column=0, columnspan=2, sticky="nsew")
-        title.grid(row=0, column=0, columnspan=2, sticky="nsew")
-
-    def reset_stats(self):
-        with open("stats.json", "w") as file:
-            file.write(json.dumps(DEFAULT))
-
     def button(self, text, on_activation, master=None):
+        """
+        Manera sencilla de crear un botón
+        :param text: Texto del botón
+        :param on_activation: función a activar en el botój
+        :param master: toplevel, en caso de ser necesario
+        :return: El widget del botón
+        """
         button_widget = tk.Button(
             self if not master else master,
             text=text,
@@ -328,12 +327,14 @@ Mejores jugadores:
         return button_widget
 
     def button_sfx(self, aditional_method):
+        """
+        Esta funcion es un auxiliar que permite agregar un efecto de sonido
+        a la hora de presionar un boton
+        :param aditional_method: Metodo adicional del boton
+        :return: None
+        """
         self.ON_SELECT.play()
         aditional_method()
-
-    def close(self, event):
-        if event.keysym == 'q' or event.keysym == 'Q':
-            self.destroy()
 
     def show_about_page(self):
         local_window = tk.Toplevel(self)
@@ -462,7 +463,7 @@ Mejores jugadores:
             width=1920,
             height=1080
         )
-
+        # Selecciona aleatoriamente uno de los equipos como local
         if not self.current_team_playing:
             self.current_team_playing = random.choice((self.blue_team, self.red_team))
         self.defending_team = self.blue_team if self.current_team_playing != self.blue_team else self.red_team
@@ -491,6 +492,7 @@ Mejores jugadores:
         coin_animation.start()
 
     def animate_coin(self, frames, coin, master):
+        # Anima la moneda por 5 segundos
         initial_time = time.time()
         while 0 <= time.time() - initial_time <= 5:
             for frame in frames:
@@ -612,16 +614,20 @@ Mejores jugadores:
         goal_width = goal_coordinates[2] - goal_coordinates[0]
         goal_anchor = goal_width // 6
         initial, final = goal_coordinates[0], goal_coordinates[2]
+        # Crea cada una de las paletas
         for i in range(6):
             x0, y0, x1, y1 = goal_coordinates
             goal_division.append(
                 [initial, y0, initial + goal_anchor, y1]
             )
+
+            # Agrega los puntos medios
             if 0 <= len(self.shooting_points) <= 5:
                 self.shooting_points.append([(2 * initial + goal_anchor) // 2, (y0 + y1) // 2])
             initial += goal_anchor
 
         penalties_blue, penalties_red = [], []
+        # Crea los indicadores del tiro de penal
         for i in range(5):
             bias = i * 20 + 20
             if self.blue_team.shot_record[i] == "empty":
@@ -666,7 +672,6 @@ Mejores jugadores:
                 penalties_red.append(oval_red)
 
         self.divisions = []
-
         for division in goal_division:
             div = game_canvas.create_rectangle(
                 *division
@@ -688,6 +693,164 @@ Mejores jugadores:
         check_goal = threading.Thread(target=self.wait_for_shot, args=(game,))
         check_goal.start()
 
+    def show_stats(self):
+        """
+        Muestra la pantalla de estadísticas
+        :return: None
+        """
+        self.withdraw()
+
+        local_window = tk.Toplevel(self)
+        local_window.config(
+            bg="#000000"
+        )
+
+        # Determina el equipo ganador
+        winner = f"{self.defending_team.name}"
+        if self.current_team_playing.score > self.defending_team.score:
+            winner = f"{self.current_team_playing.name}"
+        elif self.current_team_playing.score == self.defending_team.score:
+            winner = "Empate"
+        title = tk.Label(
+            local_window,
+            text=f"Ganador: {winner}",
+            justify="center",
+            pady=50,
+            fg="#ffffff",
+            bg="#000000",
+            font=("04b", 50)
+        )
+
+        # Esto carga las estadísticas ya guardadas en el archivo stats.json
+        stats = {}
+        with open("stats.json") as file:
+            stats_file = file.read()
+            stats = json.loads(stats_file)
+
+        # Asignados nuevos nombres para mayor facilidad
+        local_team_name = self.current_team_playing.name
+        defending_team_name = self.defending_team.name
+
+        # Variable auxiliar que permite trabajar con las stats antiguas, ya que la
+        # variable stats es modificada constantemente
+        old_stats = stats
+
+        # |===============| Equipo local |===============|
+        for player in self.current_team_playing.players:
+            # Actualiza las stats de cada jugador del team local
+            stats[local_team_name]["scores"][player.name] = {
+                "score": player.score + old_stats[local_team_name]["scores"][player.name]["score"],
+                "shots": player.shots + old_stats[local_team_name]["scores"][player.name]["shots"],
+            }
+
+        # Actualiza las stats globales del equipo local
+        stats[local_team_name]["score"] = old_stats[local_team_name]["score"] + self.current_team_playing.score
+        stats[local_team_name]["shots"] = old_stats[local_team_name]["shots"] + self.current_team_playing.shot
+
+        # |===============| Equipo defensor |===============|
+        for player in self.defending_team.players:
+            # Actualiza las stats de cada jugador del team defensor
+            stats[defending_team_name]["scores"][player.name] = {
+                "score": player.score + old_stats[defending_team_name]["scores"][player.name]["score"],
+                "shots": player.shots + old_stats[defending_team_name]["scores"][player.name]["shots"],
+            }
+
+        # Actualiza las stats globales del equipo defensor
+        stats[defending_team_name]["score"] = old_stats[defending_team_name]["score"] + self.defending_team.score
+        stats[defending_team_name]["shots"] = old_stats[defending_team_name]["shots"] + self.defending_team.shot
+
+        # Objeto json de las stats, luego es subido al archivo de stats
+        new_stats = json.dumps(stats)
+        with open("stats.json", "w") as file:
+            file.write(new_stats)
+
+        # Estas lineas consiguen los 3 mejores jugadores de cada
+        # uno de los equipos. Ordena a los jugadores por goles
+        best_local = sorted(stats[local_team_name]["scores"].items(),
+                            key=lambda x: x[1]['score'], reverse=True)
+        #                   ~~~~^^^^^^^^^^^^^^^^^^^^^^^~~~~
+        #                   Estas lineas se encargan de ordenar cada
+        #                   Uno de los items de este diccionario por goles
+
+        best_defending = sorted(stats[defending_team_name]["scores"].items(),
+                                key=lambda x: x[1]['score'], reverse=True)
+
+        # Obtiene los 3 mejores de cada uno
+        local_team_best = best_local[:3]
+        defending_best = best_defending[:3]
+
+        # En esta variable guarda las stats de cada uno de los jugadores
+        # del equipo local
+        text_local = ""
+        for player in best_local:
+            score = stats[local_team_name]["scores"][player[0]]["score"]
+            shots = stats[local_team_name]["scores"][player[0]]["shots"]
+            percent = 0
+            if shots:
+                percent = (score / shots) * 100
+            text_local += f"""
+{player[0]}
+{shots} tiros
+{score} goles
+{percent}%
+            """
+
+        # En esta variable guarda las stats de cada uno de los jugadores del
+        # equipo defensor
+        text_defending = ""
+        for player in best_defending:
+            score = stats[defending_team_name]["scores"][player[0]]["score"]
+            shots = stats[defending_team_name]["scores"][player[0]]["shots"]
+            percent = 0
+            if shots:
+                percent = (score / shots) * 100
+            text_defending += f"""
+{player[0]}
+{shots} tiros
+{score} goles
+{percent}%
+                    """
+        # Stats de cada equipo
+        info_local = tk.Label(
+            local_window,
+            text=f"""
+Tiros: {stats[local_team_name]["shots"]}
+Goles: {stats[local_team_name]["score"]}
+% de anotación: {(stats[local_team_name]["score"] / stats[local_team_name]["shots"]) * 100}
+-----------------
+Mejores jugadores:
+{text_local}
+            """,
+            justify="center",
+            fg="#ffffff",
+            bg="#000000",
+            font=("04b", 20)
+        )
+
+        info_defending = tk.Label(
+            local_window,
+            text=f"""
+Tiros: {stats[defending_team_name]["shots"]}
+Goles: {stats[defending_team_name]["score"]}
+% de anotación: {(stats[defending_team_name]["score"] / stats[defending_team_name]["shots"]) * 100}
+-----------------
+Mejores jugadores:
+        {text_defending}
+                    """,
+            justify="center",
+            fg="#ffffff",
+            bg="#000000",
+            font=("04b", 20)
+        )
+        reset_button = self.button("Resetear stats", reset_stats, master=local_window)
+        exit_button = self.button("Salir", self.destroy, master=local_window)
+
+        info_local.grid(row=1, column=0, sticky="nsew")
+        info_defending.grid(row=1, column=1, sticky="nsew")
+        reset_button.grid(row=2, column=0, columnspan=2, sticky="nsew")
+        exit_button.grid(row=3, column=0, columnspan=2, sticky="nsew")
+        title.grid(row=0, column=0, columnspan=2, sticky="nsew")
+
     def wait_for_shot(self, master):
         time.sleep(2)
         self.ON_START.play()
@@ -700,6 +863,7 @@ Mejores jugadores:
         for i, division in enumerate(self.divisions):
             if goalie[i] == "1":
                 self.game_canvas.itemconfig(division, fill="#aaaaaa")
+
         self.game_canvas.tag_raise(self.ball)
         self.draw_ball_shot(int(index))
         if is_goal == "1" and final_time - initial_time <= 5:
@@ -794,6 +958,7 @@ Mejores jugadores:
             font=("04b", 50)
         )
 
+        # Termina la partida si ambos equipos tienen 5 disparos
         if self.defending_team.shot == 5 and self.current_team_playing.shot == 5:
             self.show_stats()
             master.destroy()
@@ -804,6 +969,28 @@ Mejores jugadores:
             self.select_player()
 
     def draw_ball_shot(self, index):
+        """
+Dibuja el movimiento de la bola. Este movimiento está descrito por una función
+cuadrática, que se encargará de crear la ilusión de un movimiento acelerado, a su
+vez de un efecto tridimensional del disparo, donde el tamaño de la bola funciona
+como la profundidad del campo.
+
+El movimiento de la bola está dividido en 2 tractos. En el primero, la bola se
+moverá uniformemente acelerada en dirección de un punto en específico. Este punto
+está dado desde el punto de referencia inicial, que es aproximadamente el centro
+de la pantalla. A partir de este punto, la partícula se va a mover un porcentaje
+de su diferencia respecto al punto final (diferencia + bias). Recordemos que el
+bias es un valor adicional para que la bola de el efecto de curvatura.
+Este porcentaje, es dado por la función llamada movement_ratio (un número entre 0 y 1).
+Esto sucede en funcion del tiempo para 0 <= Δt <= 0.75, osea, para la mitad del trayecto.
+
+En el segundo trayecto, la bola empieza a caer, a causa de la parábola generada por movement_ratio
+Sin embargo, en este caso el punto de referencia cambia para que el punto final sea el punto medio
+de la paleta «index». Esto no sería posible si se hiciera el movimiento en un solo transecto, ya que
+la bola terminaríá yendo al punto inicial. Al final del disparo, la bola crea una explosión.
+        :param index: Índice de la paleta presionada
+        :return:
+        """
         self.ON_SHOT.play()
         final_coords = self.shooting_points[index]
         reference = (960, 975)
@@ -817,10 +1004,13 @@ Mejores jugadores:
         size = 128
         angle = 360
         last_pos = ()
+
         while 0 <= t <= 0.75:
             size = int(128 * (1 - t))
-            ratio = movement_ratio(t)
+            ratio = movement_ratio(t)  # 0 <= ratio <= 1
             angle = 360 * ratio
+
+            # El bias da el efecto de curvatura
             bias = 50
             if difference_x < 0:
                 bias = -50
@@ -859,6 +1049,8 @@ Mejores jugadores:
 
         self.game_canvas.delete(self.ball)
         self.ON_EXPLOSION.play()
+
+        # Animación de la explosión
         frames = [
             self.image(f"assets/explosion/fram{n}.png", (256, 256)) for n in range(1, 8)
         ]

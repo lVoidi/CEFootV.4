@@ -148,6 +148,7 @@ def main():
             anotation_algorithm = random.randint(1, 3)
 
             # Índices de las paletas en las que está el portero
+            # Elige uno de los índices aleatorios
             index_list = []
             if anotation_algorithm == 1:
                 goalkeeper_index = random.choice(goal)
