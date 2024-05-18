@@ -64,11 +64,10 @@
      </p>
      <br>
      <br>
-
+     Demostración en video: https://youtu.be/8OxAkH31ozc
      
 </div>
 
------
 
 <h2><a href="https://discord.gg/VKGgNxT7dJ" target="_blank">Unete a mi server de discord!</a></h2>
 
