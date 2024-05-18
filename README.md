@@ -55,6 +55,8 @@
 
 <img src="https://i.imgur.com/m7J5WKA.png" width=1000em>
 
+![Imagen de la maqueta](https://i.imgur.com/uoXjrvd.png)
+
 -----
 
 <div align="center" id="funcionamiento">
@@ -70,6 +72,8 @@
 
 
 <h2><a href="https://discord.gg/VKGgNxT7dJ" target="_blank">Unete a mi server de discord!</a></h2>
+
+
 
 </div>
 
