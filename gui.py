@@ -125,8 +125,8 @@ class Team:
         # Player es el jugador que está tirando actualmente
         # Goalie es el portero que está atajando actualmente
         # Inicialmente equivalen a None, después se les pone un valor
-        self.player: Player = None
-        self.goalie: Goalie = None
+        self.player: Player = Player("", "")
+        self.goalie: Goalie = Goalie("", "")
 
         # Mantiene la historia de los tiros para cada equipo.
         # Son los círculos que marcan el penal actual en la
@@ -135,7 +135,7 @@ class Team:
         # que ese turno específico fue gol y que esté rojo significa
         # que se falló ese tiro, tanto por tiempo como por atajada
         # Esta lista toma valores «empty», «goal» y «failed»
-        self.shot_record = ["empty" for _ in range(5)]
+        self.shot_record = ["empty" for _ in range(7)]
         self.path = Path(f"assets/{name}/")
 
         # Guarda el path del escudo del equipo, tanto su versión jpg como su
@@ -152,6 +152,7 @@ class Team:
         # porteros disponibles para el equipo «name».
         self.goalies = []
         self.players = []
+
         for name in os.listdir(self.goalies_path):
             # Los replace se aseguran de quitar cualquier extensión de archivo innecesaria
             self.goalies.append(Goalie(name.replace(".jpg", "").replace(".png",
@@ -204,6 +205,7 @@ class MainWindow(tk.Tk):
         self.ON_EXPLOSION = pygame.mixer.Sound("assets/explosion.mp3")
         self.ON_START = pygame.mixer.Sound("assets/pito.mp3")
         self.ON_SELECT = pygame.mixer.Sound("assets/select.mp3")
+        self.ON_VAR = pygame.mixer.Sound("assets/var.mp3")
 
         # Este contador de imágenes funciona para
         # evitar problemas con el garbage collector.
@@ -211,6 +213,11 @@ class MainWindow(tk.Tk):
 
         # ID de la bola en el self.game_canvas
         self.ball = 0
+        self.blue_score = 0 
+        self.red_score = 0 
+
+        self.index = 0
+        self.did_shot = False 
 
         # Matriz 6*2 que guarda el punto medio de cada
         # paleta. A estos puntos, es que se dirige la bola al
@@ -254,6 +261,9 @@ class MainWindow(tk.Tk):
 
         # Guarda en una pool todos los equipos posibles
         self.teams_pool = [Team("Barcelona"), Team("Manchester United"), Team("Real Madrid")]
+        
+        # To select players
+        self.counter = 0  
 
         # Configuración inicial
         self.config(
@@ -282,12 +292,17 @@ class MainWindow(tk.Tk):
         about_button.place(x=1150, y=840)
 
         # Hace que el programa se pueda cerrar presionando la q
-        self.bind("<Key>", lambda e: self.close(e))
+        self.bind("<Key>", lambda e: self.on_key_press(e))
+    
 
-    def close(self, event):
+    def on_key_press(self, event):
         if event.keysym == 'q' or event.keysym == 'Q':
             pygame.mixer.music.stop()
             self.destroy()
+        elif event.keysym == "n":
+            self.counter -= 1 
+        elif event.keysym == "m":
+            self.counter += 1 
 
     def image(self, name, resolution):
         """
@@ -324,6 +339,7 @@ class MainWindow(tk.Tk):
             font=("04b", 40),
             command=lambda: self.button_sfx(on_activation)
         )
+        
         return button_widget
 
     def button_sfx(self, aditional_method):
@@ -419,32 +435,27 @@ class MainWindow(tk.Tk):
         self.red_team_widget.place(x=1152, y=256)
         select_button.place(x=700, y=800)
         self.team_selecting_title.pack()
+        local_window.bind("<Key>", lambda e: self.on_key_press(e))
         selecting_team_thread = threading.Thread(target=self.selecting_team, args=(local_window,))
         selecting_team_thread.start()
 
     def selecting_team(self, master):
         while not self.is_team_selected:
-            try:
-                pot_value = int(update_data("SIGPOT"))
-            except:  # La única excepcion print(self.shooting_points, index, final_coords):
-                continue
-            self.blue_team = self.teams_pool[pot_value]
+            value = self.counter % 3
+            self.blue_team = self.teams_pool[value]
             blue_team_image = self.image(self.blue_team.logo, (512, 512))
             self.blue_team_widget["image"] = blue_team_image
-            time.sleep(1)
+            time.sleep(0.01)
 
         self.is_team_selected = False
         self.team_selecting_title["text"] = "Seleccionando: Rojo"
 
         while not self.is_team_selected:
-            try:
-                pot_value = int(update_data("SIGPOT"))
-            except:  # La única excepcion print(self.shooting_points, index, final_coords):
-                continue
-            self.red_team = self.teams_pool[pot_value]
+            value = self.counter % 3
+            self.red_team = self.teams_pool[value]
             red_team_image = self.image(self.red_team.logo, (512, 512))
             self.red_team_widget["image"] = red_team_image
-            time.sleep(1)
+            time.sleep(0.01)
         self.is_team_selected = False
         master.destroy()
         self.open_coin_window()
@@ -494,7 +505,7 @@ class MainWindow(tk.Tk):
     def animate_coin(self, frames, coin, master):
         # Anima la moneda por 5 segundos
         initial_time = time.time()
-        while 0 <= time.time() - initial_time <= 5:
+        while 0 <= time.time() - initial_time <= 2:
             for frame in frames:
                 coin["image"] = frame
                 time.sleep(0.05)
@@ -543,34 +554,29 @@ class MainWindow(tk.Tk):
         self.player_title.pack()
         player_window.attributes("-topmost", True)
         player_window.attributes("-fullscreen", True)
+        player_window.bind("<Key>", lambda e: self.on_key_press(e))
 
         selecting_player_thread = threading.Thread(target=self.selecting_player, args=(player_window,))
         selecting_player_thread.start()
 
     def selecting_player(self, master):
         while not self.is_player_selected:
-            try:
-                pot_value = int(update_data("SIGPOT"))
-            except:  # La única excepcion print(self.shooting_points, index, final_coords):
-                continue
-            player = self.current_team_playing.players[pot_value]
+            value = self.counter % 3
+            player = self.current_team_playing.players[value]
             self.current_team_playing.player = player
             player_image = self.image(player.path, (512, 512))
             self.player_widget["image"] = player_image
             self.player_title["text"] = f"{self.current_team_playing.name}: {player.name}"
-            time.sleep(1)
+            time.sleep(0.01)
         self.is_player_selected = False
         while not self.is_player_selected:
-            try:
-                pot_value = int(update_data("SIGPOT"))
-            except:  # La única excepcion print(self.shooting_points, index, final_coords):
-                continue
-            goalie = self.defending_team.goalies[pot_value]
+            value = self.counter % 3
+            goalie = self.defending_team.goalies[value]
             self.defending_team.goalie = goalie
             goalie_image = self.image(goalie.path, (512, 512))
             self.goalie_widget["image"] = goalie_image
             self.player_title["text"] = f"{self.defending_team.name}: {goalie.name}"
-            time.sleep(1)
+            time.sleep(0.01)
         self.is_player_selected = False
         master.destroy()
         self.start_playing()
@@ -626,50 +632,23 @@ class MainWindow(tk.Tk):
                 self.shooting_points.append([(2 * initial + goal_anchor) // 2, (y0 + y1) // 2])
             initial += goal_anchor
 
-        penalties_blue, penalties_red = [], []
-        # Crea los indicadores del tiro de penal
-        for i in range(5):
-            bias = i * 20 + 20
-            if self.blue_team.shot_record[i] == "empty":
-                oval_blue = game_canvas.create_oval(
-                    bias + i * 100, 20, bias + 100 + i * 100, 120,
-                    width=10
-                )
-                penalties_blue.append(oval_blue)
-            elif self.blue_team.shot_record[i] == "goal":
-                oval_blue = game_canvas.create_oval(
-                    bias + i * 100, 20, bias + 100 + i * 100, 120,
-                    fill="#aaffaa",
-                    width=10
-                )
-                penalties_blue.append(oval_blue)
-            elif self.blue_team.shot_record[i] == "failed":
-                oval_blue = game_canvas.create_oval(
-                    bias + i * 100, 20, bias + 100 + i * 100, 120,
-                    fill="#ffaaaa",
-                    width=10
-                )
-                penalties_blue.append(oval_blue)
-            if self.red_team.shot_record[i] == "empty":
-                oval_red = game_canvas.create_oval(
-                    1920 - i * 100 - bias, 20, 1920 - (i * 100 + 100) - bias, 120,
-                    width=10
-                )
-                penalties_red.append(oval_red)
-            elif self.red_team.shot_record[i] == "goal":
-                oval_red = game_canvas.create_oval(
-                    1920 - i * 100 - bias, 20, 1920 - (i * 100 + 100) - bias, 120,
-                    width=10,
-                    fill="#aaffaa"
-                )
-                penalties_red.append(oval_red)
-            elif self.red_team.shot_record[i] == "failed":
-                oval_red = game_canvas.create_oval(
-                    1920 - i * 100 - bias, 20, 1920 - (i * 100 + 100) - bias, 120,
-                    width=10,
-                    fill="#ffaaaa"
-                )
-                penalties_red.append(oval_red)
+        self.blue_score = self.game_canvas.create_text(
+            256, 256, 
+            text="0",
+            justify="center",
+            fill="#000000",
+            anchor="center",
+            font=("04b", 60)
+        )
+
+        self.red_score = self.game_canvas.create_text(
+            1920-256, 256, 
+            text="0",
+            justify="center",
+            fill="#000000",
+            anchor="center",
+            font=("04b", 60)
+        )
 
         self.divisions = []
         for division in goal_division:
@@ -690,8 +669,16 @@ class MainWindow(tk.Tk):
         )
 
         game_canvas.pack()
+        game.bind("<Key>", lambda e: self.do_shot(e))
         check_goal = threading.Thread(target=self.wait_for_shot, args=(game,))
         check_goal.start()
+
+    def do_shot(self, event):
+        if event.keysym in "123456":
+            self.index = int(event.keysym) - 1
+            self.did_shot = True
+            time.sleep(0.01)
+        self.did_shot = False
 
     def show_stats(self):
         """
@@ -852,21 +839,52 @@ Mejores jugadores:
         title.grid(row=0, column=0, columnspan=2, sticky="nsew")
 
     def wait_for_shot(self, master):
+        anotation_algorithm = random.randint(1, 3)
+
+        # Índices de las paletas en las que está el portero
+        # Elige uno de los índices aleatorios
+        update_data(f"SIGSCORE {self.current_team_playing.score}")
+        goal = [i for i in range(6)]
+        index_list = []
+        if anotation_algorithm == 1:
+            goalkeeper_index = random.choice(goal)
+            index_list = [goalkeeper_index, goalkeeper_index + 1] if goalkeeper_index + 1 < len(goal) else [goalkeeper_index - 1, goalkeeper_index]
+        elif anotation_algorithm == 2:
+            goalkeeper_index = random.choice(goal)
+            index_list = []
+            if goalkeeper_index == len(goal) - 1:
+                index_list = [goalkeeper_index-2, goalkeeper_index-1, goalkeeper_index]
+            elif goalkeeper_index == 0:
+                index_list = [goalkeeper_index, goalkeeper_index + 1, goalkeeper_index + 2]
+            else:
+                index_list = [goalkeeper_index-1, goalkeeper_index, goalkeeper_index + 1]
+        else:
+            group = random.randint(0, 1)
+            index_list = []
+            if group == 1:
+                index_list = list(filter(lambda x: (x % 2 == 0), goal))
+            else:
+                index_list = list(filter(lambda x: (x % 2 == 1), goal))
         time.sleep(2)
         self.ON_START.play()
         initial_time = time.time()
-        listener = update_data("SIGGOAL")
+
+        while not self.did_shot:
+            pass
 
         final_time = time.time()
-        is_goal, index, goalie = listener.split(":")
+        index = self.index
+        is_goal = True
+        if index in index_list:
+            is_goal = False
 
         for i, division in enumerate(self.divisions):
-            if goalie[i] == "1":
+            if i in index_list:
                 self.game_canvas.itemconfig(division, fill="#aaaaaa")
 
         self.game_canvas.tag_raise(self.ball)
-        self.draw_ball_shot(int(index))
-        if is_goal == "1" and final_time - initial_time <= 5:
+        self.draw_ball_shot(index)
+        if is_goal and final_time - initial_time <= 5:
             self.ON_GOAL.play()
             title = self.game_canvas.create_text(
                 0, 1080 // 2,
@@ -890,12 +908,13 @@ Mejores jugadores:
                 self.game_canvas.move(title, 1, 0)
                 self.game_canvas.move(title_2, 1, 0)
                 time.sleep(0.05)
-            for i in range(1000):
+            for i in range(100):
                 self.game_canvas.move(title, i, 0)
                 self.game_canvas.move(title_2, i, 0)
                 time.sleep(0.005)
-
-            self.current_team_playing.shot_record[self.current_team_playing.shot] = "goal"
+            
+            if self.current_team_playing.shot <= 7:
+                self.current_team_playing.shot_record[self.current_team_playing.shot] = "goal"
             self.current_team_playing.player.shots += 1
             self.current_team_playing.player.score += 1
             self.current_team_playing.score += 1
@@ -903,7 +922,7 @@ Mejores jugadores:
 
 
         else:
-            text = "ES UN \nP*JA\n DE PORTERO!!!"
+            text = "ES UN \nPIJA\n DE PORTERO!!!"
             if final_time - initial_time > 5:
                 text = "TIRO PERDIDO\n POR TIEMPO"
             self.ON_FAIL.play()
@@ -931,39 +950,72 @@ Mejores jugadores:
                 self.game_canvas.move(title, 1, 0)
                 self.game_canvas.move(title_2, 1, 0)
                 time.sleep(0.1)
-            for i in range(1000):
+            for i in range(100):
                 self.game_canvas.move(title, i, 0)
                 self.game_canvas.move(title_2, i, 0)
                 time.sleep(0.005)
-            self.current_team_playing.shot_record[self.current_team_playing.shot] = "failed"
             self.current_team_playing.player.shots += 1
             self.defending_team.goalie.saved += 1
+
         self.current_team_playing.shot += 1
+        update_data(f"SIGSCORE {self.current_team_playing.score}")
+
         time.sleep(3)
-
-        waiting_for_team_change = self.game_canvas.create_text(
-            400, 500,
-            text="PRESIONAR BOTON\n DE\n CAMBIO DE EQUIPO",
-            justify="center",
-            fill="#000000",
-            anchor="nw",
-            font=("04b", 50)
-        )
-        waiting_for_team_change_2 = self.game_canvas.create_text(
-            400 - 5, 500 - 5,
-            text="PRESIONAR BOTON\n DE\n CAMBIO DE EQUIPO",
-            justify="center",
-            fill="#ffffff",
-            anchor="nw",
-            font=("04b", 50)
-        )
-
         # Termina la partida si ambos equipos tienen 5 disparos
-        if self.defending_team.shot == 5 and self.current_team_playing.shot == 5:
+        if (self.defending_team.shot == 7 and self.current_team_playing.shot == 7) or self.defending_team.shot > 7 or self.current_team_playing.shot > 7:
+
+            if self.defending_team.name == "Real Madrid" and self.defending_team.score <= self.current_team_playing.score:
+                self.ON_VAR.play()
+                title_2 = self.game_canvas.create_text(
+                    500, 5 + 1080 // 2,
+                    text=f"El VAR ha decidido\n restarle 3 goles a {self.current_team_playing.name}",
+                    justify="center",
+                    fill="#ffffff",
+                    anchor="center",
+                    font=("Platinum Sign", 60)
+                )
+                self.current_team_playing.score = int(update_data(f"SIGVAR {self.current_team_playing.score}"))
+            elif self.current_team_playing.name == "Real Madrid" and self.current_team_playing.score <= self.defending_team.score:
+                self.ON_VAR.play()
+                title_2 = self.game_canvas.create_text(
+                    500, 5 + 1080 // 2,
+                    text=f"El VAR ha decidido\n restarle 3 goles a {self.defending_team.name}",
+                    justify="center",
+                    fill="#ffffff",
+                    anchor="center",
+                    font=("Platinum Sign", 60)
+                )
+                self.current_team_playing.score = int(update_data(f"SIGVAR {self.current_team_playing.score}"))
+
+            
+            time.sleep(5)
             self.show_stats()
             master.destroy()
         else:
-            change_team = update_data("SIGTEAM")
+            do_var_event = random.randint(1, 2) == 1
+            if do_var_event:
+                self.ON_VAR.play()
+                self.current_team_playing.score = int(update_data(f"SIGVAR {self.current_team_playing.score}"))
+                print(self.current_team_playing.score)
+
+                title_2 = self.game_canvas.create_text(
+                    700, 5 + 1080 // 2,
+                    text=f"El VAR ha decidido\n restarle 3 goles a {self.current_team_playing.name}",
+                    justify="center",
+                    fill="#ffffff",
+                    anchor="center",
+                    font=("Platinum Sign", 60)
+                )
+                self.current_team_playing.shot = self.current_team_playing.score + 1 if self.current_team_playing.score < 8 else self.current_team_playing.score
+                self.defending_team.shot = self.current_team_playing.score + 1 if self.current_team_playing.score < 8 else self.current_team_playing.score
+
+                print(self.current_team_playing.score, self.current_team_playing.name)
+                print(self.current_team_playing.shot, self.current_team_playing.name)
+                print(self.defending_team.shot, self.defending_team.name)
+                print(self.defending_team.score, self.defending_team.name)
+
+                time.sleep(5)
+            update_data("SIGTEAM")
             self.defending_team, self.current_team_playing = self.current_team_playing, self.defending_team
             master.destroy()
             self.select_player()
