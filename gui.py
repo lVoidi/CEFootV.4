@@ -913,8 +913,6 @@ Mejores jugadores:
                 self.game_canvas.move(title_2, i, 0)
                 time.sleep(0.005)
             
-            if self.current_team_playing.shot <= 7:
-                self.current_team_playing.shot_record[self.current_team_playing.shot] = "goal"
             self.current_team_playing.player.shots += 1
             self.current_team_playing.player.score += 1
             self.current_team_playing.score += 1
@@ -992,7 +990,8 @@ Mejores jugadores:
             self.show_stats()
             master.destroy()
         else:
-            do_var_event = random.randint(1, 2) == 1
+            # do_var_event = random.randint(1, 2) == 1
+            do_var_event = True
             if do_var_event:
                 self.ON_VAR.play()
                 self.current_team_playing.score = int(update_data(f"SIGVAR {self.current_team_playing.score}"))
