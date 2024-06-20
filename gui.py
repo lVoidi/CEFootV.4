@@ -9,15 +9,16 @@
 # led del equipo
 # SIGPOT: La raspberry devuelve el valor actual del potenciómetro. El valor
 # del potenciómetro es un numero entre 0 y 2, incluyéndolos.
+from dataclasses import dataclass, field
 from comunicate import update_data
 from PIL import Image, ImageTk
 from pathlib import Path
 import tkinter as tk
 import threading
-import json
 import random
-import time
 import pygame
+import json
+import time
 import os
 
 __version__ = "V2 12.5.2024"
@@ -81,78 +82,57 @@ DEFAULT = {
     }
 }
 
-
+@dataclass
 class Player:
-    def __init__(self, name, path):
-        """
-        Método constructor del jugador. Los valores
-        de cada parámetro significan lo mismo tanto
-        para el jugador como para el portero
-        :param name: Nombre del jugador (Igual que en los archivos, exceptuando extensiones)
-        :param path: Path del jugador
-        """
-        self.name = name
-        self.path = path
-        self.score = 0
-        self.shots = 0
+    """
+    :param name: Nombre del jugador, como aparece en los archivos
+    :param Path: Path del jugador, como aparece en los archivos
+    """
+    name: str
+    path: str | Path
+    score: int = 0
+    shots: int = 0
 
 
+@dataclass
 class Goalie:
-    def __init__(self, name, path):
-        """
-        Método constructor del portero. Los valores
-        de cada parámetro significan lo mismo tanto
-        para el jugador como para el portero
-        :param name: Nombre del portero (Igual que en los archivos, exceptuando extensiones)
-        :param path: Path del portero
-        """
-        self.name = name
-        self.path = path
-        self.saved = 0
+    """
+    :param name: Nombre del portero (Igual que en los archivos, exceptuando extensiones)
+    :param path: Path del portero
+    """
+    name: str
+    path: str | Path
 
 
+@dataclass
 class Team:
-    def __init__(self, name: str):
-        """
-        Inicializa la clase de un equipo «name».
-        :param name: Nombre del equipo, igual que en los archivos
-        """
-        self.name = name
-        self.score = 0
-        self.shot = 0
+    name: str
+    score: int = 0
+    shot: int = 0
+    # Jugadores en el turno actual
+    player: Player = None
+    goalie: Goalie = None
+    path: Path = None
+    shot_record: list[str] = field(default_factory=lambda: ["empty" for _ in range(7)])
+    logo: Path = None
+    logo_png: Path = None
+    def __post_init__(self):
 
-        # Estos valores van a ser alterados conforme a los turnos.
-        # Player es el jugador que está tirando actualmente
-        # Goalie es el portero que está atajando actualmente
-        # Inicialmente equivalen a None, después se les pone un valor
-        self.player: Player = Player("", "")
-        self.goalie: Goalie = Goalie("", "")
-
-        # Mantiene la historia de los tiros para cada equipo.
-        # Son los círculos que marcan el penal actual en la
-        # parte superior de la pantalla. Que esté vacío el círculo
-        # significa que aún no se ha tirado, que esté verde significa
-        # que ese turno específico fue gol y que esté rojo significa
-        # que se falló ese tiro, tanto por tiempo como por atajada
-        # Esta lista toma valores «empty», «goal» y «failed»
-        self.shot_record = ["empty" for _ in range(7)]
-        self.path = Path(f"assets/{name}/")
-
+        self.path: Path = Path(f"assets/{self.name}/")
         # Guarda el path del escudo del equipo, tanto su versión jpg como su
         # versión png. La versión jpg se necesita en la primera pantalla de
         # selección de equipo, y la versión png se ocupa para la pantalla de tiros
-        self.logo = self.path.joinpath("logo.jpg")
-        self.logo_png = self.path.joinpath("logo.png")
-
+        self.logo: Path = self.path.joinpath("logo.jpg")
+        self.logo_png: Path = self.path.joinpath("logo.png")
+        
         # Guarda los paths tanto de los jugadores como de los porteros
-        self.goalies_path = self.path.joinpath("goalie")
-        self.players_path = self.path.joinpath("player")
+        self.goalies_path: Path = self.path.joinpath("goalie")
+        self.players_path: Path = self.path.joinpath("player")
 
         # Esta parte del código guarda una pool con todos los jugadores y
         # porteros disponibles para el equipo «name».
-        self.goalies = []
-        self.players = []
-
+        self.goalies: list[str] = []
+        self.players: list[str] = []
         for name in os.listdir(self.goalies_path):
             # Los replace se aseguran de quitar cualquier extensión de archivo innecesaria
             self.goalies.append(Goalie(name.replace(".jpg", "").replace(".png",
@@ -160,8 +140,9 @@ class Team:
                                        self.goalies_path.joinpath(name)))
         for name in os.listdir(self.players_path):
             self.players.append(Player(name.replace(".jpg", "").replace(".png",
-                                                                        "").replace("jpeg", ""),
-                                       self.players_path.joinpath(name)))
+                                                                            "").replace("jpeg", ""),
+                                           self.players_path.joinpath(name)))
+    
 
 
 def movement_ratio(t):
@@ -966,22 +947,22 @@ Mejores jugadores:
                 self.ON_VAR.play()
                 title_2 = self.game_canvas.create_text(
                     500, 5 + 1080 // 2,
-                    text=f"El VAR ha decidido\n restarle 3 goles a {self.current_team_playing.name}",
+                    text=f"El VAR HA DECIDIDO\n RESTARLE 3 GOLES A\n {self.current_team_playing.name.upper()}",
                     justify="center",
                     fill="#ffffff",
                     anchor="center",
-                    font=("Platinum Sign", 60)
+                    font=("Platinum Sign", 40)
                 )
                 self.current_team_playing.score = int(update_data(f"SIGVAR {self.current_team_playing.score}"))
             elif self.current_team_playing.name == "Real Madrid" and self.current_team_playing.score <= self.defending_team.score:
                 self.ON_VAR.play()
                 title_2 = self.game_canvas.create_text(
                     500, 5 + 1080 // 2,
-                    text=f"El VAR ha decidido\n restarle 3 goles a {self.defending_team.name}",
+                    text=f"El VAR HA DECIDIDO\n RESTARLE 3 GOLES A\n {self.defending_team.name.upper()}",
                     justify="center",
                     fill="#ffffff",
                     anchor="center",
-                    font=("Platinum Sign", 60)
+                    font=("Platinum Sign", 40)
                 )
                 self.current_team_playing.score = int(update_data(f"SIGVAR {self.current_team_playing.score}"))
 
@@ -990,8 +971,8 @@ Mejores jugadores:
             self.show_stats()
             master.destroy()
         else:
-            # do_var_event = random.randint(1, 2) == 1
-            do_var_event = True
+            do_var_event = random.randint(1, 3) == 1
+            # do_var_event = True
             if do_var_event:
                 self.ON_VAR.play()
                 self.current_team_playing.score = int(update_data(f"SIGVAR {self.current_team_playing.score}"))
@@ -999,11 +980,11 @@ Mejores jugadores:
 
                 title_2 = self.game_canvas.create_text(
                     700, 5 + 1080 // 2,
-                    text=f"El VAR ha decidido\n restarle 3 goles a {self.current_team_playing.name}",
+                    text=f"EL VAR HA DECIDIDO\n RESTARLE 3 GOLES A\n {self.current_team_playing.name.upper()}",
                     justify="center",
                     fill="#ffffff",
                     anchor="center",
-                    font=("Platinum Sign", 60)
+                    font=("Platinum Sign", 50)
                 )
                 self.current_team_playing.shot = self.current_team_playing.score + 1 if self.current_team_playing.score < 8 else self.current_team_playing.score
                 self.defending_team.shot = self.current_team_playing.score + 1 if self.current_team_playing.score < 8 else self.current_team_playing.score

@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "cefootv-4"
+version = "0.1.0"
+description = ""
+authors = ["void <lvoidiss@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "cefootv"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.poetry.group.dev.dependencies]
+pillow = "^10.3.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
