@@ -1,3 +1,4 @@
+# This is the file that runs on RPI
 from machine import Pin, ADC
 import network
 import json
